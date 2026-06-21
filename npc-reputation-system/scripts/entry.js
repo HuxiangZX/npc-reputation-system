@@ -14,7 +14,7 @@ Hooks.once("init", () => {
     game.settings.registerMenu(MODULE_ID, "menuFactionManager", {
         name:       "派系 & NPC 管理",
         label:      "🏛 打开派系管理",
-        hint:       "管理派系结构、NPC录入、区域绑定。",
+        hint:       "管理派系结构、NPC录入。",
         icon:       "fas fa-sitemap",
         type:       FactionManagerLauncher,
         restricted: true

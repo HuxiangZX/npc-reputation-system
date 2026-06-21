@@ -258,29 +258,6 @@ function _bindGMInterceptButton() {
     });
 }
 
-// ─── 区域触发支持（tokenEnter 事件） ─────────────────────────
-function _bindRegionHook() {
-    Hooks.on("tokenEnter", (tokenDoc) => {
-        if (!tokenDoc?.hasPlayerOwner) return;
-        const sys = _getSettings();
-        if (!sys || sys.mode === 2) return; // 模式2不处理区域
-
-        const checkRegion = (npc) =>
-            npc.regions?.some(r =>
-                r.code === region?.id ||
-                r.code === region?.name ||
-                (region?.document && r.code === region.document.uuid)
-            );
-
-        const matchedNpcs = [];
-        Object.values(sys.fullData.factions).forEach(f => {
-            if (f) f.members.filter(checkRegion).forEach(n => matchedNpcs.push(n));
-        });
-        sys.fullData.independent.filter(checkRegion).forEach(n => matchedNpcs.push(n));
-        matchedNpcs.forEach(n => _queueNpcTrigger(tokenDoc, n));
-    });
-}
-
 // ─── 公开的启动 / 关闭接口 ───────────────────────────────────
 
 export function initRadarEngine() {
@@ -294,7 +271,6 @@ export function initRadarEngine() {
 
     _registerHideHook();
     _bindGMInterceptButton();
-    _bindRegionHook();
 
     const delay = sys.hopperDelay;
     const debouncedRadar = foundry.utils.debounce((tokenDoc) => {

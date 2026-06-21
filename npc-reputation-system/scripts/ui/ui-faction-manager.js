@@ -91,16 +91,6 @@ export function openAdminPanel(expandedFactions = _expandedFactions) {
 
     // ── 渲染单个 NPC 行 ───────────────────────────────────────
     const renderNpc = (npc, fId) => {
-        const regs = npc.regions?.map((r, rIdx) => `
-            <div class="reg-tag">
-                <span class="reg-link" data-code="${r.code}">
-                    <i class="fas fa-map-marker-alt"></i> ${r.name}
-                </span>
-                <i class="fas fa-pencil-alt edit-reg-btn"
-                   data-nid="${npc.id}" data-ridx="${rIdx}"></i>
-            </div>`).join("") ||
-            '<span style="color:#777; font-size:0.85em;">未绑定区域</span>';
-
         const titleDisplay = (fId === "ind" || !fId) ? "无派系" : (npc.title || "平民");
 
         return `
@@ -112,13 +102,8 @@ export function openAdminPanel(expandedFactions = _expandedFactions) {
                     ${npc.name}
                     <span class="rank-tag">${titleDisplay}</span>
                 </div>
-                <div class="npc-regs">${regs}</div>
             </div>
             <div style="display:flex; gap:4px;">
-                <button class="n-btn add-reg" data-nid="${npc.id}"
-                    style="padding:4px 8px;">
-                    <i class="fas fa-plus"></i>
-                </button>
                 <button class="n-btn edit-npc-f" data-nid="${npc.id}" data-fid="${fId || "ind"}"
                     style="padding:4px 8px; background:#2980b9;">
                     <i class="fas fa-user-edit"></i>
@@ -253,72 +238,6 @@ function _bindAdminEvents(html, data, journal, refresh, renderNpc, expandedFacti
         game.actors.get($(e.currentTarget).data("id"))?.sheet.render(true)
     );
 
-    // ── 区域跳转 ─────────────────────────────────────────────
-    html.find(".reg-link").click(async e => {
-        const code   = $(e.currentTarget).data("code");
-        const region = canvas.regions.placeables.find(r =>
-            r.document.id   === code ||
-            r.document.name === code ||
-            r.document.uuid === code
-        );
-        if (region) {
-            canvas.animatePan({ x: region.center.x, y: region.center.y, duration: 600 });
-            ui.notifications.success(`已定位至: ${region.document.name}`);
-        } else {
-            ui.notifications.warn("未能在当前地图找到该区域。");
-        }
-    });
-
-    // ── 编辑区域 ─────────────────────────────────────────────
-    html.find(".edit-reg-btn").click(e => {
-        const nid  = $(e.currentTarget).data("nid");
-        const rIdx = $(e.currentTarget).data("ridx");
-        let npc    = data.independent.find(x => x.id === nid);
-        if (!npc) {
-            for (const f of Object.values(data.factions)) {
-                const n = f?.members.find(x => x.id === nid);
-                if (n) { npc = n; break; }
-            }
-        }
-        if (!npc?.regions?.[rIdx]) return;
-        const reg = npc.regions[rIdx];
-
-        new Dialog({
-            title:   `编辑区域: ${reg.name}`,
-            content: `<div style="padding:10px;">
-                <label>显示名称</label>
-                <input type="text" id="edit-rn" value="${reg.name}"
-                    style="width:100%; margin-bottom:10px; background:#222;
-                           border:1px solid #555; color:#fff; padding:6px;">
-                <label>逻辑代码/UUID</label>
-                <input type="text" id="edit-rc" value="${reg.code}"
-                    style="width:100%; background:#222; border:1px solid #555;
-                           color:#fff; padding:6px;">
-            </div>`,
-            buttons: {
-                save: {
-                    label: "保存更改", icon: '<i class="fas fa-save"></i>',
-                    callback: async (h) => {
-                        npc.regions[rIdx] = {
-                            name: h.find("#edit-rn").val().trim(),
-                            code: h.find("#edit-rc").val().trim()
-                        };
-                        await saveRepData(data);
-                        refresh();
-                    }
-                },
-                del: {
-                    label: "删除关联", icon: '<i class="fas fa-trash"></i>',
-                    callback: async () => {
-                        npc.regions.splice(rIdx, 1);
-                        await saveRepData(data);
-                        refresh();
-                    }
-                }
-            }
-        }, { resizable: true }).render(true);
-    });
-
     // ── 修改NPC归属 ───────────────────────────────────────────
     html.find(".edit-npc-f").click(e => {
         const nid    = $(e.currentTarget).data("nid");
@@ -404,43 +323,6 @@ function _bindAdminEvents(html, data, journal, refresh, renderNpc, expandedFacti
         }, { resizable: true }).render(true);
     });
 
-    // ── 新增区域 ─────────────────────────────────────────────
-    html.find(".add-reg").click(e => {
-        const nid = $(e.currentTarget).data("nid");
-        new Dialog({
-            title:   "新增关联区域",
-            content: `<div style="padding:10px">
-                <label>显示名称（例如：北城门）</label>
-                <input type="text" id="rn"
-                    style="width:100%; margin-bottom:10px; background:#222;
-                           border:1px solid #555; color:#fff; padding:6px;">
-                <label>区域代码/UUID</label>
-                <input type="text" id="rc"
-                    style="width:100%; background:#222; border:1px solid #555;
-                           color:#fff; padding:6px;">
-            </div>`,
-            buttons: {
-                ok: {
-                    label: "绑定", icon: '<i class="fas fa-link"></i>',
-                    callback: async (h) => {
-                        const n = h.find("#rn").val().trim();
-                        const c = h.find("#rc").val().trim();
-                        if (!n && !c) return;
-                        const upd = (list) => {
-                            const x = list.find(y => y.id === nid);
-                            if (x) { x.regions ??= []; x.regions.push({ name: n, code: c }); }
-                        };
-                        Object.values(data.factions).forEach(f => { if (f) upd(f.members); });
-                        upd(data.independent);
-                        await saveRepData(data);
-                        refresh();
-                    }
-                },
-                cancel: { label: "取消" }
-            }
-        }, { resizable: true }).render(true);
-    });
-
     // ── 修改派系图标 ──────────────────────────────────────────
     html.find(".edit-f-img").click(e => {
         const fid = $(e.currentTarget).data("fid");
@@ -507,7 +389,6 @@ function _bindAdminEvents(html, data, journal, refresh, renderNpc, expandedFacti
                             img:      selectedActor.img,
                             title:    job.name,
                             weight:   job.weight,
-                            regions:  [],
                             affection: 0
                         };
                         if (fid === "ind") data.independent.push(npc);

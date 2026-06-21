@@ -1,7 +1,3 @@
-/**
- * ui-quest-fullscreen.js
- */
-
 import {
     getRepData, saveRepData,
     getQuests, saveQuests,
@@ -18,6 +14,7 @@ import {
 
 let _sessionActiveNpcId  = null;
 let _sessionExpandedFids = null;
+let _sessionSidebarCollapsed = true;
 let _app = null;
 
 export function openQuestFullscreen(options = {}) {
@@ -37,6 +34,7 @@ class QuestFullscreen {
         this._expandedFids = _sessionExpandedFids !== null
             ? new Set(_sessionExpandedFids)
             : null;
+        this._isSidebarCollapsed = _sessionSidebarCollapsed;
     }
 
     // ══════════════════════════════════════════════════════════
@@ -47,24 +45,38 @@ class QuestFullscreen {
         await this._loadData();
 
         if (this._expandedFids === null) {
-            const fids = this._repData.factionOrder
-                ?? Object.keys(this._repData.factions ?? {});
-            this._expandedFids = new Set([...fids, "ind"]);
+            this._expandedFids = new Set();
             _sessionExpandedFids = [...this._expandedFids];
         }
 
+        // 恢复了原本支持 CSS 全屏布局的类名 qfs-layout 和 qfs-body
         this._el = $(`
-        <div id="npc-quest-fullscreen">
-            <div class="qfs-layout">
-                <div class="qfs-sidebar"  id="qfs-sidebar"></div>
-                <div class="qfs-body">
-                    <div class="qfs-toolbar" id="qfs-toolbar"></div>
-                    <div class="qfs-content" id="qfs-content"></div>
+            <div id="npc-quest-fullscreen">
+                <button id="qfs-toggle-sidebar" title="展开/折叠侧边栏"
+                    style="position:absolute; left:16px; top:12px; z-index:9005;
+                           background:none; border:none; color:#aaa; font-size:1.4em; cursor:pointer; padding:0; transition:color 0.2s;">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="qfs-layout">
+                    <div class="qfs-sidebar" id="qfs-sidebar"></div>
+                    <div class="qfs-body">
+                        <div class="qfs-toolbar" id="qfs-toolbar"></div>
+                        <div class="qfs-content" id="qfs-content"></div>
+                    </div>
                 </div>
             </div>
-        </div>`);
+        `);
 
         $("body").append(this._el);
+
+        this._applySidebarState();
+
+        this._el.find("#qfs-toggle-sidebar").on("click", () => {
+            this._isSidebarCollapsed = !this._isSidebarCollapsed;
+            _sessionSidebarCollapsed = this._isSidebarCollapsed;
+            this._applySidebarState(); 
+        });
+
         this._renderSidebar();
         this._renderToolbar();
         this._renderContent();
@@ -149,34 +161,45 @@ class QuestFullscreen {
         $("#qfs-modal-wrap-singleton").remove();
     }
 
+    _applySidebarState() {
+        if (typeof this._isSidebarCollapsed === "undefined") {
+            this._isSidebarCollapsed = typeof _sessionSidebarCollapsed !== "undefined" ? _sessionSidebarCollapsed : true;
+        }
+        const sb = this._el.find("#qfs-sidebar");
+        const tb = this._el.find("#qfs-toolbar");
+        sb.css({ "transition": "width 0.2s, opacity 0.2s", "overflow": "hidden", "white-space": "nowrap" });
+        tb.css({ "transition": "padding-left 0.2s" });
+
+        if (this._isSidebarCollapsed) {
+            sb.css({ width: "0px", opacity: "0", borderRight: "none", pointerEvents: "none" });
+            tb.css({ "padding-left": "48px" });
+        } else {
+            // 这里将侧边栏收窄到了 200px
+            sb.css({ width: "200px", opacity: "1", borderRight: "1px solid #222", pointerEvents: "auto" });
+            tb.css({ "padding-left": "20px" });
+        }
+    }
+
     // ══════════════════════════════════════════════════════════
     // 侧边栏
     // ══════════════════════════════════════════════════════════
 
-    _renderSidebar() {
+   _renderSidebar() {
         const sb   = this._el.find("#qfs-sidebar");
         const data = this._repData;
-        const factionOrder = data.factionOrder
-            ?? Object.keys(data.factions ?? {});
+        const factionOrder = data.factionOrder ?? Object.keys(data.factions ?? {});
 
-        const totalQ    = this._isGM
-            ? this._quests
-            : this._filterForPlayer(this._quests);
+        const totalQ    = this._isGM ? this._quests : this._filterForPlayer(this._quests);
         const totalCnt  = totalQ.length;
         const activeCnt = totalQ.filter(q => q.status === "active").length;
 
         let html = `
-        <div class="qfs-sb-header">
-            <i class="fas fa-scroll"></i> 任务管理
-            <button class="qfs-close-btn" id="qfs-close-btn"
-                title="关闭 (ESC)">
-                <i class="fas fa-times"></i>
-            </button>
+        <div class="qfs-sb-header" style="padding-left:48px; justify-content:flex-start; gap:8px;">
+            <i class="fas fa-scroll" style="color:#3498db;"></i>
+            <span style="color:#3498db; font-weight:bold;">任务管理</span>
         </div>
         <div class="qfs-sb-scroll">
-            <div class="qfs-npc-row
-                ${this._activeNpcId === null ? "active" : ""}"
-                data-npcid="__ALL__">
+            <div class="qfs-npc-row ${this._activeNpcId === null ? "active" : ""}" data-npcid="__ALL__">
                 <div class="qfs-npc-avatar-placeholder">
                     <i class="fas fa-layer-group"></i>
                 </div>
@@ -185,12 +208,8 @@ class QuestFullscreen {
                     <div class="qfs-npc-sub">所有 NPC</div>
                 </div>
                 <div class="qfs-npc-meta">
-                    ${activeCnt > 0
-                        ? `<span class="qfs-dot active">${activeCnt}</span>`
-                        : ""}
-                    ${totalCnt > 0
-                        ? `<span class="qfs-dot total">${totalCnt}</span>`
-                        : ""}
+                    ${activeCnt > 0 ? `<span class="qfs-dot active">${activeCnt}</span>` : ""}
+                    ${totalCnt > 0 ? `<span class="qfs-dot total">${totalCnt}</span>` : ""}
                 </div>
             </div>
             <div class="qfs-sb-divider"></div>`;
@@ -202,17 +221,12 @@ class QuestFullscreen {
             html += `
             <div class="qfs-faction-block">
                 <div class="qfs-faction-header" data-fid="${fid}">
-                    <i class="fas fa-chevron-${expanded ? "down" : "right"}
-                        qfs-fchev"></i>
-                    <img src="${f.img || "icons/svg/item-bag.svg"}"
-                         class="qfs-faction-icon">
+                    <i class="fas fa-chevron-${expanded ? "down" : "right"} qfs-fchev"></i>
+                    <img src="${f.img || "icons/svg/item-bag.svg"}" class="qfs-faction-icon">
                     <span class="qfs-faction-name">${f.name}</span>
-                    <span class="qfs-faction-count">
-                        ${f.members.length}
-                    </span>
+                    <span class="qfs-faction-count">${f.members.length}</span>
                 </div>
-                <div class="qfs-faction-members"
-                    ${expanded ? "" : "style=\"display:none\""}>
+                <div class="qfs-faction-members" ${expanded ? "" : "style=\"display:none\""}>
                     ${f.members.map(n => this._buildNpcRow(n)).join("")}
                 </div>
             </div>`;
@@ -223,16 +237,11 @@ class QuestFullscreen {
             html += `
             <div class="qfs-faction-block">
                 <div class="qfs-faction-header" data-fid="ind">
-                    <i class="fas fa-chevron-${expanded ? "down" : "right"}
-                        qfs-fchev"></i>
-                    <span class="qfs-faction-name"
-                        style="margin-left:4px;">独立 NPC</span>
-                    <span class="qfs-faction-count">
-                        ${data.independent.length}
-                    </span>
+                    <i class="fas fa-chevron-${expanded ? "down" : "right"} qfs-fchev"></i>
+                    <span class="qfs-faction-name" style="margin-left:4px;">独立 NPC</span>
+                    <span class="qfs-faction-count">${data.independent.length}</span>
                 </div>
-                <div class="qfs-faction-members"
-                    ${expanded ? "" : "style=\"display:none\""}>
+                <div class="qfs-faction-members" ${expanded ? "" : "style=\"display:none\""}>
                     ${data.independent.map(n => this._buildNpcRow(n)).join("")}
                 </div>
             </div>`;
@@ -248,13 +257,11 @@ class QuestFullscreen {
             if (this._expandedFids.has(fid)) {
                 this._expandedFids.delete(fid);
                 members.slideUp(150);
-                chev.removeClass("fa-chevron-down")
-                    .addClass("fa-chevron-right");
+                chev.removeClass("fa-chevron-down").addClass("fa-chevron-right");
             } else {
                 this._expandedFids.add(fid);
                 members.slideDown(150);
-                chev.removeClass("fa-chevron-right")
-                    .addClass("fa-chevron-down");
+                chev.removeClass("fa-chevron-right").addClass("fa-chevron-down");
             }
             _sessionExpandedFids = [...this._expandedFids];
         });
@@ -270,8 +277,6 @@ class QuestFullscreen {
             this._renderToolbar();
             this._renderContent();
         });
-
-        sb.find("#qfs-close-btn").on("click", () => this._doClose());
     }
 
     _buildNpcRow(npc) {
@@ -283,25 +288,18 @@ class QuestFullscreen {
         const isActive  = this._activeNpcId === npc.id;
 
         return `
-        <div class="qfs-npc-row ${isActive ? "active" : ""}"
-            data-npcid="${npc.id}">
+        <div class="qfs-npc-row ${isActive ? "active" : ""}" data-npcid="${npc.id}">
             <img src="${npc.img}" class="qfs-npc-avatar">
             <div class="qfs-npc-info">
                 <div class="qfs-npc-name">${npc.name}</div>
                 <div class="qfs-npc-sub">${npc.title || "平民"}</div>
             </div>
             <div class="qfs-npc-meta">
-                ${active > 0
-                    ? `<span class="qfs-dot active">${active}</span>` : ""}
-                ${total > 0
-                    ? `<span class="qfs-dot total">${total}</span>` : ""}
+                ${active > 0 ? `<span class="qfs-dot active">${active}</span>` : ""}
+                ${total > 0 ? `<span class="qfs-dot total">${total}</span>` : ""}
             </div>
         </div>`;
     }
-
-    // ══════════════════════════════════════════════════════════
-    // 工具栏
-    // ══════════════════════════════════════════════════════════
 
     _renderToolbar() {
         const npc = this._activeNpcId
@@ -316,8 +314,7 @@ class QuestFullscreen {
         const stLabels = this._isGM ? dmLb : plLb;
 
         const statusBtns = stKeys.map((v, i) => `
-            <button class="qfs-status-btn
-                ${this._activeStatus === v ? "active" : ""}"
+            <button class="qfs-status-btn ${this._activeStatus === v ? "active" : ""}"
                 data-status="${v}">${stLabels[i]}</button>`
         ).join("");
 
@@ -329,8 +326,7 @@ class QuestFullscreen {
                        ${npc.title || "平民"} · 声望 ${npc.affection ?? 0}
                    </div>
                </div>`
-            : `<div class="qfs-npc-avatar-placeholder"
-                   style="width:36px;height:36px;font-size:1.2em;">
+            : `<div class="qfs-npc-avatar-placeholder" style="width:36px;height:36px;font-size:1.2em;">
                    <i class="fas fa-layer-group"></i>
                </div>
                <div class="qfs-tb-name">全部任务</div>`;
@@ -342,17 +338,27 @@ class QuestFullscreen {
             : "";
 
         this._el.find("#qfs-toolbar").html(`
-        <div class="qfs-tb-npc">${npcBar}</div>
-        <div class="qfs-tb-center">
+        <div class="qfs-tb-npc" style="flex-shrink:0;">
+            ${npcBar}
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; margin-left:15px; flex-shrink:0;">
+            <input type="text" id="qfs-search" placeholder="搜索任务…" value="${this._searchText}" class="qfs-search-input">
+            ${addBtn}
+        </div>
+        <div class="qfs-tb-center" style="flex:1; display:flex; justify-content:center;">
             <div class="qfs-status-bar">${statusBtns}</div>
         </div>
-        <div class="qfs-tb-right">
-            <input type="text" id="qfs-search"
-                placeholder="搜索任务…"
-                value="${this._searchText}"
-                class="qfs-search-input">
-            ${addBtn}
+        <div class="qfs-tb-right" style="flex-shrink:0;">
+            <button class="qfs-close-btn" id="qfs-close-btn" title="关闭 (ESC)">
+                <i class="fas fa-times"></i>
+            </button>
         </div>`);
+
+        if (this._isSidebarCollapsed) {
+            this._el.find("#qfs-toolbar").css("padding-left", "48px");
+        } else {
+            this._el.find("#qfs-toolbar").css("padding-left", "20px");
+        }
 
         this._el.find(".qfs-status-btn").on("click", (e) => {
             this._activeStatus = $(e.currentTarget).data("status");
@@ -362,17 +368,15 @@ class QuestFullscreen {
         });
 
         this._el.find("#qfs-search").on("input", (e) => {
-            this._searchText = e.target.value;
+            this._searchText = e.target.value.trim();
             this._renderContent();
         });
 
         this._el.find("#qfs-add-btn").on("click",
             () => this._openQuestEditor(null));
-    }
 
-    // ══════════════════════════════════════════════════════════
-    // 内容区
-    // ══════════════════════════════════════════════════════════
+        this._el.find("#qfs-close-btn").on("click", () => this._doClose());
+    }
 
     _renderContent() {
         let quests = [...this._quests];
