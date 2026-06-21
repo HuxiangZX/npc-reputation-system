@@ -1,0 +1,48 @@
+{
+  "id": "npc-reputation-system",
+  "title": "NPC声望与任务系统",
+  "description": "<p>为FVTT提供完整的NPC声望管理、派系联动、任务委托与玩家互动面板。依赖 Calendaria。<br />B站UID：50513135</p>",
+  "version": "1.0.0",
+  "compatibility": {
+    "minimum": "13",
+    "verified": "13",
+    "maximum": "13"
+  },
+  "authors": [
+    {
+      "name": "D",
+      "email": "1840713334@qq.com",
+      "flags": {}
+    }
+  ],
+  "relationships": {
+    "requires": [
+      {
+        "id": "calendaria",
+        "type": "module",
+        "compatibility": {
+          "minimum": "1.0.0",
+          "verified": "1.99.99"
+        }
+      }
+    ]
+  },
+  "esmodules": [
+    "scripts/entry.js"
+  ],
+  "styles": [
+    {
+      "src": "styles/admin.css"
+    },
+    {
+      "src": "styles/dm-panel.css"
+    },
+    {
+      "src": "styles/player-panel.css"
+    },
+    {
+      "src": "styles/quest-fullscreen.css"
+    }
+  ],
+  "flags": {}
+}

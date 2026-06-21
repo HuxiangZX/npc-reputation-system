@@ -1,0 +1,315 @@
+/* ============================================================
+   admin.css
+   对应：ui-faction-manager.js / ui-backup.js / ui-settings-panel.js
+   来源：原宏1 <style> 块
+   ============================================================ */
+
+/* ── 整体容器 ─────────────────────────────────────────────── */
+.npc-admin {
+    background:    #1a1a1a;
+    color:         #eee;
+    padding:       12px;
+    font-family:   'Signika', sans-serif;
+    border-radius: 8px;
+}
+
+.admin-scroll-area {
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: 5px;
+    margin-bottom: 10px;
+}
+
+.admin-scroll-area::-webkit-scrollbar {
+    width: 6px;
+}
+.admin-scroll-area::-webkit-scrollbar-thumb {
+    background:    #555;
+    border-radius: 3px;
+}
+
+/* ── 派系块 ──────────────────────────────────────────────── */
+.faction-block {
+    border:        1px solid #444;
+    margin-bottom: 12px;
+    border-radius: 6px;
+    background:    #252525;
+    transition:    transform 0.2s;
+}
+
+.f-header {
+    background:   #333;
+    padding:      10px;
+    cursor:       pointer;
+    display:      flex;
+    align-items:  center;
+    gap:          10px;
+    border-bottom: 1px solid #444;
+}
+.f-header:hover {
+    background: #3a3a3a;
+}
+
+.f-icon {
+    width:      24px;
+    height:     24px;
+    object-fit: contain;
+    border:     1px solid #555;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+/* ── NPC 行 ──────────────────────────────────────────────── */
+.npc-item {
+    display:       flex;
+    align-items:   center;
+    gap:           12px;
+    background:    #111;
+    margin:        6px;
+    padding:       8px;
+    border-radius: 4px;
+    border-left:   3px solid #555;
+    transition:    transform 0.2s;
+}
+
+.npc-img {
+    width:        36px;
+    height:       36px;
+    border-radius: 50%;
+    border:       1px solid #444;
+    cursor:       pointer;
+    object-fit:   cover;
+}
+
+.npc-main-info {
+    flex: 1;
+}
+
+.npc-name-row {
+    font-weight:  bold;
+    font-size:    1.1em;
+    display:      flex;
+    align-items:  center;
+    gap:          8px;
+    margin-bottom: 4px;
+}
+
+.rank-tag {
+    color:         #f1c40f;
+    background:    rgba(241, 196, 15, 0.1);
+    padding:       1px 6px;
+    border-radius: 3px;
+    font-size:     0.8em;
+}
+
+/* ── 区域标签 ─────────────────────────────────────────────── */
+.reg-tag {
+    display:       inline-flex;
+    align-items:   center;
+    gap:           4px;
+    background:    rgba(52, 152, 219, 0.15);
+    border:        1px solid #2980b9;
+    padding:       2px 6px;
+    border-radius: 4px;
+    margin-right:  6px;
+    margin-top:    2px;
+}
+
+.reg-link {
+    color:       #3498db;
+    cursor:      pointer;
+    font-size:   0.85em;
+    font-weight: bold;
+}
+.reg-link:hover {
+    color:           #5dade2;
+    text-decoration: underline;
+}
+
+.edit-reg-btn {
+    color:     #aaa;
+    cursor:    pointer;
+    font-size: 0.8em;
+    margin-left: 2px;
+}
+.edit-reg-btn:hover {
+    color: #fff;
+}
+
+/* ── 通用按钮 ─────────────────────────────────────────────── */
+.n-btn {
+    background:   #333;
+    border:       1px solid #555;
+    color:        #fff;
+    padding:      6px 10px;
+    border-radius: 4px;
+    cursor:       pointer;
+    transition:   0.2s;
+    display:      inline-flex;
+    align-items:  center;
+    justify-content: center;
+    gap:          6px;
+}
+.n-btn:hover:not(:disabled) {
+    background: #555;
+}
+.n-btn:disabled {
+    opacity: 0.5;
+    cursor:  not-allowed;
+}
+
+/* ── 底部工具栏 ───────────────────────────────────────────── */
+.footer-tools {
+    display:     flex;
+    gap:         8px;
+    border-top:  1px solid #444;
+    padding-top: 12px;
+    flex-wrap:   wrap;
+}
+
+/* ── 派系职位编辑区 ───────────────────────────────────────── */
+.job-list-edit {
+    background:    #1a1a1a;
+    padding:       10px;
+    border-radius: 6px;
+    margin:        8px 0;
+    border:        1px solid #333;
+    box-shadow:    inset 0 0 5px rgba(0, 0, 0, 0.5);
+}
+
+.job-row {
+    display:       flex;
+    gap:           6px;
+    margin-bottom: 6px;
+    align-items:   center;
+}
+.job-row input {
+    background:    #111;
+    border:        1px solid #444;
+    color:         #eee;
+    padding:       4px 6px;
+    border-radius: 3px;
+}
+.job-row input:focus {
+    border-color: #3498db;
+    outline:      none;
+}
+
+.j-del-btn {
+    background:     #c0392b;
+    border:         none;
+    color:          white;
+    cursor:         pointer;
+    border-radius:  3px;
+    width:          28px;
+    height:         28px;
+    display:        flex;
+    align-items:    center;
+    justify-content: center;
+}
+.j-del-btn:hover {
+    background: #e74c3c;
+}
+
+/* ── 搜索框 ───────────────────────────────────────────────── */
+.search-box {
+    width:         100%;
+    padding:       10px;
+    background:    #333;
+    border:        1px solid #777;
+    color:         #fff;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    font-size:     1em;
+    box-shadow:    inset 0 1px 3px rgba(0, 0, 0, 0.5);
+    outline:       none;
+    transition:    border-color 0.2s;
+}
+.search-box:focus {
+    background:  #222;
+    border-color: #3498db;
+    box-shadow:  0 0 6px rgba(52, 152, 219, 0.8);
+}
+
+/* ── Actor 搜索结果列表 ───────────────────────────────────── */
+.actor-scroll {
+    max-height: 150px;
+    overflow-y: auto;
+    border:     1px solid #444;
+    margin:     5px 0;
+    background: #111;
+}
+
+.actor-opt {
+    padding:       6px 10px;
+    cursor:        pointer;
+    border-bottom: 1px solid #222;
+    color:         #eee;
+    font-weight:   bold;
+}
+.actor-opt:hover {
+    background: #333;
+    color:      #fff;
+}
+.actor-opt.selected {
+    background: #27ae60;
+    color:      #fff;
+}
+
+/* ── 拖拽排序手柄 ─────────────────────────────────────────── */
+.drag-handle {
+    cursor:          grab;
+    color:           #666;
+    font-size:       1.2em;
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+    width:           24px;
+    padding:         4px;
+    margin-right:    4px;
+}
+.drag-handle:hover {
+    color:      #fff;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+.drag-handle:active {
+    cursor: grabbing;
+    color:  #f1c40f;
+}
+
+/* 拖拽目标指示线 */
+.drag-over-top {
+    border-top:              3px solid #f39c12 !important;
+    border-top-left-radius:  0 !important;
+    border-top-right-radius: 0 !important;
+}
+.drag-over-bottom {
+    border-bottom:              3px solid #f39c12 !important;
+    border-bottom-left-radius:  0 !important;
+    border-bottom-right-radius: 0 !important;
+}
+
+/* ── 设置面板行 ───────────────────────────────────────────── */
+.set-row {
+    display:         flex;
+    justify-content: space-between;
+    align-items:     center;
+    margin-bottom:   10px;
+    background:      #2c3e50;
+    padding:         8px;
+    border-radius:   4px;
+    border:          1px solid #34495e;
+    color:           #ecf0f1;
+}
+
+/* ── 预设行 ───────────────────────────────────────────────── */
+.preset-row {
+    display:         flex;
+    justify-content: space-between;
+    align-items:     center;
+    background:      #1a252f;
+    padding:         8px;
+    margin-bottom:   6px;
+    border-radius:   4px;
+    border:          1px solid #2c3e50;
+}

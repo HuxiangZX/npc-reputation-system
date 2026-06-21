@@ -1,0 +1,432 @@
+/* ============================================================
+   quest-fullscreen.css
+   ============================================================ */
+
+#npc-quest-fullscreen {
+    position:   fixed;
+    inset:      0;
+    z-index:    9000;
+    background: #111;
+    color:      #eee;
+    font-family:'Signika', sans-serif;
+    display:    flex;
+    overflow:   hidden;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   内部模态弹窗（z-index 高于全屏本身，完全在全屏内部渲染）
+   ══════════════════════════════════════════════════════════════ */
+.qfs-modal-wrap {
+    position:        fixed;
+    inset:           0;
+    z-index:         10000;
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+    background:      rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(2px);
+}
+
+.qfs-modal {
+    background:    #1e1e1e;
+    border:        1px solid #333;
+    border-radius: 8px;
+    box-shadow:    0 8px 40px rgba(0,0,0,0.8);
+    display:       flex;
+    flex-direction:column;
+    max-height:    85vh;
+    overflow:      hidden;
+}
+
+.qfs-modal-header {
+    display:         flex;
+    align-items:     center;
+    justify-content: space-between;
+    padding:         12px 16px;
+    border-bottom:   1px solid #2a2a2a;
+    font-weight:     bold;
+    font-size:       1em;
+    color:           #e67e22;
+    flex:            none;
+}
+
+.qfs-modal-close-btn {
+    background:    none;
+    border:        1px solid #333;
+    color:         #666;
+    width:         26px;
+    height:        26px;
+    border-radius: 4px;
+    cursor:        pointer;
+    display:       flex;
+    align-items:   center;
+    justify-content: center;
+    font-size:     0.85em;
+    transition:    0.15s;
+}
+.qfs-modal-close-btn:hover { background: #c0392b; border-color: #e74c3c; color: #fff; }
+
+.qfs-modal-body {
+    overflow-y: auto;
+    padding:    16px;
+    flex:       1;
+}
+.qfs-modal-body::-webkit-scrollbar { width: 5px; }
+.qfs-modal-body::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+.qfs-modal-footer {
+    display:       flex;
+    gap:           8px;
+    justify-content: flex-end;
+    padding:       12px 16px;
+    border-top:    1px solid #2a2a2a;
+    flex:          none;
+}
+
+.qfs-modal-btn {
+    display:       flex;
+    align-items:   center;
+    gap:           5px;
+    padding:       7px 16px;
+    border-radius: 5px;
+    border:        none;
+    cursor:        pointer;
+    font-size:     0.88em;
+    font-family:   inherit;
+    font-weight:   bold;
+    transition:    0.15s;
+}
+.qfs-modal-btn-confirm { background: #1e6b30; color: #7dda8c; }
+.qfs-modal-btn-confirm:hover { background: #27ae60; color: #fff; }
+.qfs-modal-btn-cancel  { background: #2a2a2a; color: #aaa; }
+.qfs-modal-btn-cancel:hover  { background: #3a3a3a; color: #eee; }
+.qfs-modal-btn-danger  { background: #6b1e1e; color: #e07070; }
+.qfs-modal-btn-danger:hover  { background: #c0392b; color: #fff; }
+
+/* ── 结算弹窗内容 ─────────────────────────────────────────── */
+.qfs-settle-body { color: #eee; }
+.qfs-settle-hint {
+    color:         #aaa;
+    font-size:     0.9em;
+    margin:        0 0 12px 0;
+}
+.qfs-settle-cols {
+    display: flex;
+    gap:     16px;
+}
+.qfs-settle-col { flex: 1; }
+.qfs-settle-col-border { border-right: 1px dashed #333; padding-right: 16px; }
+.qfs-settle-col-title {
+    font-weight:   bold;
+    font-size:     0.9em;
+    margin-bottom: 10px;
+    padding-bottom:6px;
+    border-bottom: 1px solid #2a2a2a;
+}
+.qfs-settle-row {
+    display:         flex;
+    justify-content: space-between;
+    align-items:     center;
+    margin-bottom:   8px;
+    background:      #151515;
+    padding:         6px 8px;
+    border-radius:   4px;
+    border:          1px solid #222;
+}
+.qfs-settle-row label { color: #aaa; font-size: 0.88em; margin: 0; }
+.qfs-settle-row-global { background: #1a1a1a; border-color: #2a2a2a; }
+.qfs-settle-input {
+    width:        64px;
+    height:       28px;
+    padding:      0 6px;
+    background:   #000;
+    color:        #fff;
+    border:       1px solid #444;
+    border-radius:3px;
+    text-align:   center;
+    font-size:    0.9em;
+}
+
+/* ── 推进阶段弹窗 ─────────────────────────────────────────── */
+.qfs-next-phase-body {
+    color:       #3498db;
+    font-size:   1.05em;
+    text-align:  center;
+    padding:     8px 0;
+    line-height: 1.6;
+}
+
+/* ── 删除确认弹窗 ─────────────────────────────────────────── */
+.qfs-confirm-body {
+    color:       #eee;
+    font-size:   0.95em;
+    line-height: 1.6;
+}
+.qfs-confirm-body b { color: #e74c3c; }
+
+/* ── 编辑器内部 ───────────────────────────────────────────── */
+.qfs-editor-inner {
+    padding:    12px;
+    background: #1a1a1a;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   两栏布局
+   ══════════════════════════════════════════════════════════════ */
+.qfs-layout {
+    display:  flex;
+    width:    100%;
+    height:   100%;
+    overflow: hidden;
+}
+
+/* ── 侧边栏 ───────────────────────────────────────────────── */
+.qfs-sidebar {
+    width:          240px;
+    flex:           none;
+    background:     #161616;
+    border-right:   1px solid #222;
+    display:        flex;
+    flex-direction: column;
+    overflow:       hidden;
+}
+
+.qfs-sb-header {
+    display:         flex;
+    align-items:     center;
+    justify-content: space-between;
+    padding:         0 14px;
+    height:          50px;
+    font-weight:     bold;
+    color:           #3498db;
+    border-bottom:   1px solid #222;
+    background:      #1a1a1a;
+    flex:            none;
+}
+
+.qfs-close-btn {
+    background:    none;
+    border:        1px solid #333;
+    color:         #666;
+    width:         28px;
+    height:        28px;
+    border-radius: 4px;
+    cursor:        pointer;
+    display:       flex;
+    align-items:   center;
+    justify-content: center;
+    transition:    0.15s;
+    font-size:     0.9em;
+}
+.qfs-close-btn:hover { background: #c0392b; border-color: #e74c3c; color: #fff; }
+
+.qfs-sb-scroll {
+    flex:       1;
+    overflow-y: auto;
+    padding:    6px 0 20px;
+}
+.qfs-sb-scroll::-webkit-scrollbar { width: 4px; }
+.qfs-sb-scroll::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 2px; }
+
+.qfs-sb-divider { height: 1px; background: #222; margin: 4px 0; }
+
+.qfs-faction-header {
+    display:     flex;
+    align-items: center;
+    gap:         6px;
+    padding:     6px 12px;
+    cursor:      pointer;
+    background:  #1a1a1a;
+    user-select: none;
+    transition:  background 0.12s;
+    border-bottom: 1px solid #1e1e1e;
+}
+.qfs-faction-header:hover { background: #1e1e1e; }
+.qfs-faction-icon  { width:16px; height:16px; object-fit:contain; border-radius:2px; opacity:0.7; }
+.qfs-faction-name  { flex:1; font-size:0.76em; font-weight:bold; color:#777; text-transform:uppercase; letter-spacing:0.05em; }
+.qfs-faction-count { font-size:0.7em; background:#222; color:#555; padding:1px 5px; border-radius:8px; }
+.qfs-fchev         { font-size:0.68em; color:#444; width:10px; }
+
+.qfs-npc-row {
+    display:     flex;
+    align-items: center;
+    gap:         8px;
+    padding:     7px 10px 7px 18px;
+    cursor:      pointer;
+    border-left: 3px solid transparent;
+    transition:  background 0.12s;
+}
+.qfs-npc-row:hover  { background: #1c1c1c; }
+.qfs-npc-row.active { background: #1b2838; border-left-color: #3498db; }
+
+.qfs-npc-avatar {
+    width:36px; height:36px; border-radius:4px;
+    object-fit:contain; background:rgba(0,0,0,0.5);
+    border:1px solid #2a2a2a; flex:none;
+}
+.qfs-npc-avatar-placeholder {
+    width:36px; height:36px; border-radius:4px;
+    background:#1e1e1e; border:1px solid #2a2a2a;
+    display:flex; align-items:center; justify-content:center;
+    color:#444; font-size:1em; flex:none;
+}
+.qfs-npc-info    { flex:1; min-width:0; }
+.qfs-npc-name    { font-size:0.88em; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.qfs-npc-sub     { font-size:0.72em; color:#555; }
+.qfs-npc-meta    { display:flex; flex-direction:column; align-items:flex-end; gap:2px; }
+.qfs-dot         { font-size:0.68em; padding:1px 4px; border-radius:8px; font-weight:bold; }
+.qfs-dot.active  { background:rgba(230,126,34,0.12); color:#e67e22; border:1px solid #e67e2230; }
+.qfs-dot.total   { background:rgba(50,50,50,0.4);    color:#555;    border:1px solid #33333330; }
+
+/* ── 右侧主体 ─────────────────────────────────────────────── */
+.qfs-body {
+    flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden;
+}
+
+/* ── 工具栏 ───────────────────────────────────────────────── */
+.qfs-toolbar {
+    display:flex; align-items:center; gap:14px;
+    padding:0 20px; height:50px;
+    background:#1a1a1a; border-bottom:1px solid #222; flex:none;
+}
+.qfs-tb-npc    { display:flex; align-items:center; gap:10px; min-width:180px; }
+.qfs-tb-avatar { width:36px; height:36px; border-radius:5px; object-fit:contain; background:rgba(0,0,0,0.5); border:1px solid #2a2a2a; }
+.qfs-tb-name   { font-size:1em; font-weight:bold; color:#f1c40f; }
+.qfs-tb-sub    { font-size:0.78em; color:#666; }
+
+.qfs-tb-center { flex:1; display:flex; justify-content:center; }
+.qfs-status-bar { display:flex; gap:3px; }
+.qfs-status-btn {
+    background:#1e1e1e; border:1px solid #2a2a2a; color:#666;
+    padding:4px 12px; border-radius:4px; cursor:pointer;
+    font-size:0.82em; font-family:inherit; transition:0.12s;
+}
+.qfs-status-btn:hover  { background:#252525; color:#bbb; }
+.qfs-status-btn.active { background:#1d3a52; border-color:#3498db; color:#fff; font-weight:bold; }
+
+.qfs-tb-right  { display:flex; align-items:center; gap:8px; }
+.qfs-search-input {
+    background:#111; color:#fff; border:1px solid #2a2a2a;
+    padding:0 10px; height:30px; border-radius:4px; width:170px;
+    font-family:inherit; font-size:0.85em; outline:none; transition:0.15s;
+}
+.qfs-search-input:focus { border-color:#3498db; }
+
+.qfs-icon-btn {
+    display:flex; align-items:center; gap:5px;
+    padding:0 12px; height:30px; border-radius:4px;
+    border:none; cursor:pointer; font-size:0.82em;
+    font-family:inherit; font-weight:bold; color:#fff;
+    white-space:nowrap; transition:0.12s;
+}
+.qfs-icon-btn.green { background:#1e6b30; }
+.qfs-icon-btn.green:hover { background:#27ae60; }
+
+/* ── 内容区 ───────────────────────────────────────────────── */
+.qfs-content {
+    flex:1; overflow-y:auto; padding:18px 20px;
+}
+.qfs-content::-webkit-scrollbar { width:6px; }
+.qfs-content::-webkit-scrollbar-thumb { background:#2a2a2a; border-radius:3px; }
+
+.qfs-empty {
+    display:flex; flex-direction:column; align-items:center;
+    justify-content:center; height:50vh; color:#333;
+    gap:12px; font-size:1em;
+}
+.qfs-empty i { font-size:3em; }
+
+/* ── 分组 ─────────────────────────────────────────────────── */
+.qfs-group { margin-bottom:28px; }
+.qfs-group-header {
+    display:flex; align-items:center; gap:8px;
+    padding:6px 0 8px; border-bottom:1px solid #1e1e1e; margin-bottom:12px;
+}
+.qfs-group-avatar { width:22px; height:22px; border-radius:3px; object-fit:contain; background:rgba(0,0,0,0.4); }
+.qfs-group-name   { font-weight:bold; color:#e67e22; font-size:0.95em; flex:1; }
+.qfs-group-count  { font-size:0.78em; color:#555; }
+.qfs-grid-inner   { padding-left:4px; }
+
+/* ── 卡片网格 ─────────────────────────────────────────────── */
+.qfs-grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));
+    gap:12px; align-content:start;
+}
+
+/* ── 卡片 ─────────────────────────────────────────────────── */
+.qfs-card {
+    background:#181818; border:1px solid #222;
+    border-top:3px solid #444; border-radius:6px;
+    padding:12px 13px; display:flex; flex-direction:column;
+    gap:7px; transition:box-shadow 0.15s;
+}
+.qfs-card:hover { box-shadow:0 2px 12px rgba(0,0,0,0.6); }
+
+.qfs-card-top {
+    display:flex; justify-content:space-between;
+    align-items:flex-start; gap:6px;
+}
+.qfs-card-name  { font-size:1.02em; font-weight:bold; color:#e67e22; flex:1; line-height:1.3; }
+
+.qfs-status-pill { font-size:0.7em; padding:2px 7px; border-radius:10px; white-space:nowrap; flex:none; font-weight:bold; }
+.qfs-status-pill.gray  { background:#1e1e1e; color:#666;    border:1px solid #2a2a2a; }
+.qfs-status-pill.blue  { background:#0e1e2d; color:#3498db; border:1px solid #1a3a52; }
+.qfs-status-pill.green { background:#0d1f13; color:#27ae60; border:1px solid #174d25; }
+.qfs-status-pill.red   { background:#1f0e0e; color:#e74c3c; border:1px solid #4d1717; }
+
+.qfs-card-tags  { display:flex; flex-wrap:wrap; gap:3px; }
+.qfs-tag        { font-size:0.7em; padding:1px 5px; border-radius:3px; font-weight:bold; }
+.qfs-tag.blue   { background:#0e1e2d; color:#3498db; border:1px solid #1a3a5230; }
+.qfs-tag.orange { background:#1e140a; color:#e67e22; border:1px solid #7d4e0030; }
+.qfs-tag.green  { background:#0a1a10; color:#27ae60; border:1px solid #174d2530; }
+.qfs-tag.gray   { background:#1a1a1a; color:#555;    border:1px solid #2a2a2a30; }
+.qfs-tag.purple { background:#170d22; color:#9b59b6; border:1px solid #5b2c8030; }
+
+.qfs-card-desc {
+    font-size:0.93em; color:#ccc; line-height:1.6;
+    white-space:pre-wrap; background:#111;
+    padding:8px 10px; border-radius:4px;
+    border-left:3px solid #1e1e1e;
+    max-height:9.3em; overflow-y:auto; flex:1;
+}
+.qfs-card-desc::-webkit-scrollbar { width:3px; }
+.qfs-card-desc::-webkit-scrollbar-thumb { background:#2a2a2a; }
+
+.qfs-card-rewards {
+    display:flex; flex-wrap:wrap; gap:8px;
+    font-size:0.8em; color:#f1c40f;
+    padding-top:5px; border-top:1px solid #1e1e1e;
+}
+.qfs-card-rewards span { display:flex; align-items:center; gap:3px; }
+
+.qfs-card-timeline {
+    display:flex; flex-direction:column; gap:3px;
+    font-size:0.74em; color:#555;
+    border-top:1px dashed #1e1e1e; padding-top:5px;
+}
+.qfs-timeline-row {
+    display:flex; gap:12px; flex-wrap:wrap; align-items:center;
+}
+.qfs-timeline-row span { display:flex; align-items:center; gap:3px; }
+.qfs-pay-row    { cursor:help; }
+.qfs-pay-row:hover { color:#f1c40f; }
+
+.qfs-card-actions {
+    display:flex; gap:4px; flex-wrap:wrap;
+    border-top:1px solid #1e1e1e; padding-top:7px; margin-top:1px;
+}
+.qfs-act-btn {
+    display:flex; align-items:center; gap:3px;
+    padding:3px 8px; border-radius:3px; border:none;
+    cursor:pointer; font-size:0.76em; font-family:inherit;
+    font-weight:bold; transition:filter 0.12s, background 0.12s;
+}
+.qfs-act-btn:hover   { filter:brightness(1.3); }
+.qfs-act-btn.accept  { background:#1a3d22; color:#4caf7d; }
+.qfs-act-btn.complete{ background:#132540; color:#5aadea; }
+.qfs-act-btn.fail    { background:#3d1a1a; color:#e07070; }
+.qfs-act-btn.reset   { background:#2a2010; color:#d4a030; }
+.qfs-act-btn.pay     { background:#2a1540; color:#c07fe0; }
+.qfs-act-btn.edit    { background:#1a2030; color:#6090c0; }
+.qfs-act-btn.del     { background:#2a1010; color:#b05050; }
