@@ -78,14 +78,6 @@ Hooks.once("init", () => {
         onDown:     () => _playerOpenPanel()
     });
 
-    game.keybindings.register(MODULE_ID, "openQuestFullscreen", {
-        name:       "打开全屏任务管理页面",
-        hint:       "打开独立的全屏任务管理中心；已打开则关闭。",
-        editable:   [],
-        restricted: false,
-        onDown:     () => _toggleQuestFullscreen()
-    });
-
     console.log(`[${MODULE_ID}] ✅ init 完成`);
 });
 

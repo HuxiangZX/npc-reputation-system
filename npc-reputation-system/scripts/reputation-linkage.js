@@ -56,16 +56,12 @@ export async function propagateFactionLinkage(
         return;
     }
 
-    // 发送方广播倍率（按权重区间）
     const srcWeight = sourceNPC.weight ?? 1;
-    let broadcastMult = 1.0;
-    for (const rule of (srcLink.rules ?? [])) {
-        if (srcWeight >= rule.min && srcWeight <= rule.max) {
-            broadcastMult = rule.mult ?? 1.0;
-            break;
-        }
-    }
-    console.log(`${PREFIX} 广播倍率:${broadcastMult}`);
+
+    // 发送方广播倍率：用接收方权重去匹配发送方的 rules 区间
+    // rules 存在发送方 repLink.rules，每条规则是 { min, max, mult }
+    // 含义：对权重在 [min, max] 范围内的接收方，广播倍率为 mult
+    const srcRules = srcLink.rules ?? [];
 
     let changed = false;
 
@@ -80,18 +76,61 @@ export async function propagateFactionLinkage(
             continue;
         }
 
-        // 接收方对发送方的特殊倍率
-        let rcvMult = rcvLink.mult ?? 1.0;
-        if (rcvLink.ignores?.[sourceNPC.id] !== undefined) {
-            rcvMult = rcvLink.ignores[sourceNPC.id];
+        // 检查发送方是否针对该接收方设置了屏蔽/特殊倍率（ignores key 为接收方id）
+        // 注意：ignores 在接收方 rcvLink 里，key 是来源NPC的id
+        // 即：接收方对某个特定来源设置特殊倍率
+        let rcvSpecialMult = null;
+        if (rcvLink.ignores && sourceNPC.id in rcvLink.ignores) {
+            rcvSpecialMult = rcvLink.ignores[sourceNPC.id];
+            console.log(`${PREFIX} ${member.name} 对来源 ${sourceNPC.name} 有特殊倍率: ${rcvSpecialMult}`);
         }
 
-        const finalChange = Math.round(changeAmt * broadcastMult * rcvMult);
-        console.log(`${PREFIX} ${member.name} | 接收倍率:${rcvMult} | 最终变动:${finalChange}`);
+        // 接收方个人基础接收倍率
+        const rcvBaseMult = rcvLink.mult ?? 1.0;
+
+        // 发送方广播倍率：用接收方的权重匹配发送方的规则区间
+        const rcvWeight = member.weight ?? 1;
+        let broadcastMult = 0;
+        let matchedRule = false;
+        for (const rule of srcRules) {
+            const rMin = rule.min ?? 0;
+            const rMax = rule.max ?? 0;
+            if (rcvWeight >= rMin && rcvWeight <= rMax) {
+                broadcastMult = rule.mult ?? 0;
+                matchedRule = true;
+                break;
+            }
+        }
+
+        if (!matchedRule && srcRules.length > 0) {
+            console.log(`${PREFIX} 跳过 ${member.name}（权重${rcvWeight}不在发送方任何规则区间内）`);
+            continue;
+        }
+
+        if (matchedRule && broadcastMult === 0) {
+            console.log(`${PREFIX} 跳过 ${member.name}（广播倍率为0）`);
+            continue;
+        }
+
+        // 如果发送方没有配置任何规则，广播倍率默认1
+        if (!matchedRule && srcRules.length === 0) {
+            broadcastMult = 1.0;
+        }
+
+        // 最终变动量计算
+        // 如果接收方对该来源有特殊倍率（包括0），优先用特殊倍率替代基础接收倍率
+        const effectiveRcvMult = rcvSpecialMult !== null ? rcvSpecialMult : rcvBaseMult;
+
+        if (rcvSpecialMult === 0) {
+            console.log(`${PREFIX} 跳过 ${member.name}（来源特殊倍率为0，屏蔽）`);
+            continue;
+        }
+
+        const finalChange = Math.round(changeAmt * broadcastMult * effectiveRcvMult);
+        console.log(`${PREFIX} ${member.name} | rcvWeight:${rcvWeight} | broadcastMult:${broadcastMult} | effectiveRcvMult:${effectiveRcvMult} | 最终变动:${finalChange}`);
 
         if (finalChange === 0) continue;
 
-        // 根据 pcid 决定写全局还是写玩家个人
         if (pcid === "global") {
             const oldVal = member.affection || 0;
             member.affection = oldVal + finalChange;
@@ -105,6 +144,8 @@ export async function propagateFactionLinkage(
             });
             console.log(`${PREFIX} ✅ ${member.name} 全局 ${oldVal}→${member.affection}`);
         } else {
+            const actor = game.actors.get(pcid);
+            if (!actor || actor.type.match(/party|group/i)) continue;
             member.playerAffection       ??= {};
             member.playerAffection[pcid] ??= { affection: 0, history: [] };
             const oldVal = member.playerAffection[pcid].affection || 0;

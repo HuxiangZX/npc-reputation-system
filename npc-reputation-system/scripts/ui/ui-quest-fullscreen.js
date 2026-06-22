@@ -319,12 +319,13 @@ class QuestFullscreen {
         ).join("");
 
         const npcBar = npc
-            ? `<img src="${npc.img}" class="qfs-tb-avatar">
-               <div>
-                   <div class="qfs-tb-name">${npc.name}</div>
-                   <div class="qfs-tb-sub">
-                       ${npc.title || "平民"} · 声望 ${npc.affection ?? 0}
-                   </div>
+            ? `<div class="qfs-tb-name qfs-tb-avatar-clickable"
+                   data-npcid="${npc.id}" title="点击打开管理面板"
+                   style="cursor:pointer; text-decoration:underline dotted;">
+                   ${npc.name}
+               </div>
+               <div class="qfs-tb-sub">
+                   ${npc.title || "平民"} · 声望 ${npc.affection ?? 0}
                </div>`
             : `<div class="qfs-npc-avatar-placeholder" style="width:36px;height:36px;font-size:1.2em;">
                    <i class="fas fa-layer-group"></i>
@@ -365,6 +366,13 @@ class QuestFullscreen {
             this._el.find(".qfs-status-btn").removeClass("active");
             $(e.currentTarget).addClass("active");
             this._renderContent();
+        });
+
+        this._el.find(".qfs-tb-avatar-clickable").on("click", async (e) => {
+            const npcId = $(e.currentTarget).data("npcid");
+            if (!npcId) return;
+            const { openDMPanel } = await import("./ui-dm-panel.js");
+            openDMPanel(npcId);
         });
 
         this._el.find("#qfs-search").on("input", (e) => {
@@ -590,13 +598,17 @@ class QuestFullscreen {
                 q.phases.length <= 1 ||
                 cp >= q.phases.length - 1;
 
+            const isOwnedByActiveNpc = this._activeNpcId !== null
+                ? q.npcId === this._activeNpcId
+                : true;
+
             if (q.status === "avail") {
                 actionBtns = `
                 <button class="qfs-act-btn accept"
                     data-action="accept" data-qid="${q.id}">
                     <i class="fas fa-play"></i> 接取
                 </button>
-                ${!isShared ? `
+                ${isOwnedByActiveNpc ? `
                 <button class="qfs-act-btn edit"
                     data-action="edit" data-qid="${q.id}">
                     <i class="fas fa-edit"></i>
@@ -627,7 +639,7 @@ class QuestFullscreen {
                     data-action="fail" data-qid="${q.id}">
                     <i class="fas fa-times"></i> 失败
                 </button>
-                ${!isShared ? `
+                ${isOwnedByActiveNpc ? `
                 <button class="qfs-act-btn edit"
                     data-action="edit" data-qid="${q.id}">
                     <i class="fas fa-edit"></i>
@@ -639,7 +651,7 @@ class QuestFullscreen {
                     data-action="reset" data-qid="${q.id}">
                     <i class="fas fa-undo"></i> 重置
                 </button>
-                ${!isShared ? `
+                ${isOwnedByActiveNpc ? `
                 <button class="qfs-act-btn del"
                     data-action="delete" data-qid="${q.id}">
                     <i class="fas fa-trash"></i>
@@ -705,8 +717,13 @@ class QuestFullscreen {
         this._repData = getRepData();
         this._allNpcs = getAllNPCs(this._repData);
 
-        const npcObj = this._allNpcs.find(n => n.id === q.npcId);
-        if (!npcObj) return;
+        const npcObj = this._allNpcs.find(n => n.id === q.npcId) ?? {
+            id:             q.npcId,
+            name:           "未知NPC",
+            affection:      0,
+            history:        [],
+            playerAffection: {}
+        };
 
         const cp         = q.currentPhase ?? 0;
         const phase      = q.phases?.length > cp ? q.phases[cp] : q;
@@ -947,7 +964,7 @@ class QuestFullscreen {
         this._allNpcs = getAllNPCs(this._repData);
 
         if (q.appliedAffection) {
-            const npcObj     = this._allNpcs.find(n => n.id === q.npcId);
+            const npcObj     = this._allNpcs.find(n => n.id === q.npcId) ?? null;
             const isShared   = this._activeNpcId !== null
                 && q.npcId !== this._activeNpcId;
             const settlerNPC = isShared

@@ -289,9 +289,8 @@
     padding:0 20px; height:50px;
     background:#1a1a1a; border-bottom:1px solid #222; flex:none;
 }
-.qfs-tb-npc    { display:flex; align-items:center; gap:10px; min-width:180px; }
-.qfs-tb-avatar { width:36px; height:36px; border-radius:5px; object-fit:contain; background:rgba(0,0,0,0.5); border:1px solid #2a2a2a; }
-.qfs-tb-name   { font-size:1em; font-weight:bold; color:#f1c40f; }
+.qfs-tb-npc    { display:flex; align-items:center; gap:10px; width:220px; flex:none; overflow:hidden; }
+.qfs-tb-name   { font-size:1em; font-weight:bold; color:#f1c40f; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:140px; }
 .qfs-tb-sub    { font-size:0.78em; color:#666; }
 
 .qfs-tb-center { flex:1; display:flex; justify-content:center; }

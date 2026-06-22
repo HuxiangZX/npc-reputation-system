@@ -339,10 +339,55 @@ function _bindAdminEvents(html, data, journal, refresh, renderNpc, expandedFacti
     // ── 删除NPC ───────────────────────────────────────────────
     html.find(".del-npc").click(async e => {
         const { nid, fid } = $(e.currentTarget).data();
-        if (fid) data.factions[fid].members = data.factions[fid].members.filter(m => m.id !== nid);
-        else     data.independent            = data.independent.filter(m => m.id !== nid);
-        await saveRepData(data);
-        refresh();
+        const npcObj = fid
+            ? data.factions[fid]?.members.find(m => m.id === nid)
+            : data.independent.find(m => m.id === nid);
+        if (!npcObj) return;
+
+        new Dialog({
+            title: `删除确认`,
+            content: `
+            <div style="padding:12px; color:#eee; font-family:'Signika',sans-serif;">
+                <p style="margin-top:0;">确定要删除 <b style="color:#e67e22;">${npcObj.name}</b> 吗？</p>
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;
+                    background:#2c3e50; padding:8px; border-radius:4px; border:1px solid #34495e;">
+                    <input type="checkbox" id="del-with-data" checked
+                        style="width:16px; height:16px; cursor:pointer;">
+                    <span>一并删除对应数据（声望、任务，含共享任务中的目标引用）</span>
+                </label>
+            </div>`,
+            buttons: {
+                yes: {
+                    label: '<i class="fas fa-trash"></i> 确认删除',
+                    callback: async (h) => {
+                        const withData = h.find("#del-with-data").is(":checked");
+
+                        if (fid) data.factions[fid].members = data.factions[fid].members.filter(m => m.id !== nid);
+                        else     data.independent            = data.independent.filter(m => m.id !== nid);
+                        await saveRepData(data);
+
+                        if (withData) {
+                            const { getQuests, saveQuests } = await import("../data-manager.js");
+                            const quests = await getQuests();
+                            const filtered = quests.filter(q => {
+                                if (q.npcId === nid) return false;
+                                return true;
+                            }).map(q => {
+                                if (q.sharedWith?.includes(nid)) {
+                                    q.sharedWith = q.sharedWith.filter(id => id !== nid);
+                                }
+                                return q;
+                            });
+                            await saveQuests(filtered);
+                        }
+
+                        refresh();
+                    }
+                },
+                no: { label: "取消" }
+            },
+            default: "no"
+        }, { width: 400 }).render(true);
     });
 
     // ── 录入新NPC ─────────────────────────────────────────────
@@ -528,7 +573,7 @@ function _openFactionManager(data, journal, refresh) {
             const n = h.find("#new-f-n").val().trim();
             if (!n) return ui.notifications.warn("请输入派系名称");
             const nid = foundry.utils.randomID();
-            data.factions[nid]   = {
+            data.factions[nid] = {
                 name: n, img: "icons/svg/item-bag.svg", members: [],
                 jobs: [{ name: "首领", weight: 10 }, { name: "平民", weight: 2 }]
             };
@@ -564,10 +609,58 @@ function _openFactionManager(data, journal, refresh) {
 
         h.find(".f-del-btn").off("click").click(function () {
             const fid = $(this).data("fid");
-            $(`.job-list-edit[data-fid="${fid}"]`).remove();
-            data.factions[`-=${fid}`] = null;
-            delete data.factions[fid];
-            data.factionOrder = data.factionOrder.filter(x => x !== fid);
+            const fName = data.factions[fid]?.name || "未知派系";
+            const memberCount = data.factions[fid]?.members?.length || 0;
+
+            new Dialog({
+                title: `删除派系确认`,
+                content: `
+                <div style="padding:12px; color:#eee; font-family:'Signika',sans-serif;">
+                    <p style="margin-top:0;">确定要删除派系 <b style="color:#e67e22;">${fName}</b> 吗？
+                    ${memberCount > 0 ? `（含 <b style="color:#e74c3c;">${memberCount}</b> 名成员）` : ""}</p>
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer;
+                        background:#2c3e50; padding:8px; border-radius:4px; border:1px solid #34495e;">
+                        <input type="checkbox" id="del-faction-with-data" checked
+                            style="width:16px; height:16px; cursor:pointer;">
+                        <span>一并删除派系下所有NPC的数据（声望、任务，含共享任务中的目标引用）</span>
+                    </label>
+                </div>`,
+                buttons: {
+                    yes: {
+                        label: '<i class="fas fa-trash"></i> 确认删除',
+                        callback: async (dh) => {
+                            const withData = dh.find("#del-faction-with-data").is(":checked");
+                            const members = data.factions[fid]?.members ?? [];
+
+                            $(`.job-list-edit[data-fid="${fid}"]`).remove();
+                            data.factions[`-=${fid}`] = null;
+                            delete data.factions[fid];
+                            data.factionOrder = data.factionOrder.filter(x => x !== fid);
+                            await saveRepData(data);
+
+                            if (withData && members.length > 0) {
+                                const memberIds = members.map(m => m.id);
+                                const { getQuests, saveQuests } = await import("../data-manager.js");
+                                const quests = await getQuests();
+                                const filtered = quests.filter(q => {
+                                    if (memberIds.includes(q.npcId)) return false;
+                                    return true;
+                                }).map(q => {
+                                    if (q.sharedWith?.some(id => memberIds.includes(id))) {
+                                        q.sharedWith = q.sharedWith.filter(id => !memberIds.includes(id));
+                                    }
+                                    return q;
+                                });
+                                await saveQuests(filtered);
+                            }
+
+                            refresh();
+                        }
+                    },
+                    no: { label: "取消" }
+                },
+                default: "no"
+            }, { width: 420 }).render(true);
         });
     };
 

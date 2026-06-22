@@ -582,9 +582,11 @@ export function bindQuestEditorEvents(html, context) {
         }
         renderTargetTags(html);
     });
-
-    html.find("#act-cancel-edit").off("click").on("click", () =>
-        fillForm(html, null, context.factionMembers, context.allNpcsRaw));
+    
+    html.find("#act-cancel-edit").off("click").on("click", () => {
+        fillForm(html, null, context.factionMembers, context.allNpcsRaw);
+        html.find("#quest-editor-inline").slideUp(150);
+    });
 
     html.find(".apply-preset").click(function () {
         if (_currentEditPhases.length === 0)

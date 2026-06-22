@@ -164,7 +164,7 @@ export async function openDMPanel(npcId, options = {}) {
                         style="width:200px; background:#1a1a1a; color:#fff;
                                border:1px solid #555; padding:0 8px; height:32px; border-radius:4px;">
                         <option value="global">🌍 全局声望 (Global)</option>
-                        ${partyOptHtml}${pcOptsHtml}
+                        ${pcOptsHtml}
                     </select>
                     <div style="flex:1;"></div>
                     <button type="button" class="q-btn act-backup-sys"
@@ -259,35 +259,27 @@ export async function openDMPanel(npcId, options = {}) {
                 </div>
             </div>
 
-            <!-- 标签页 -->
-            <div class="tab-nav">
-                <div class="tab-btn active" data-tab="board">
+            <!-- 任务板行 -->
+            <div style="display:flex; align-items:center; gap:8px;
+                 background:#222; border:1px solid #444; border-radius:4px 4px 0 0;
+                 padding:0 10px; height:40px; margin-bottom:0; flex-shrink:0;">
+                <span style="font-weight:bold; color:#fff; flex:1;">
                     <i class="fas fa-clipboard-list"></i> 任务板
-                </div>
-                <div class="tab-btn" data-tab="edit">
-                    <i class="fas fa-plus-circle"></i> 添加/编辑/复制
-                </div>
-                <div class="tab-btn" data-tab="phrases">
-                    <i class="fas fa-comment-dots"></i> 互动语录
-                </div>
-            </div>
-
-            <div class="tab-content active" id="tab-board">
-                <div id="board-container"></div>
-            </div>
-
-            <div class="tab-content" id="tab-edit">
-                ${buildQuestEditorHTML(systemPresets, factionMembers, targetOptions, shareCbsHtml)}
-            </div>
-
-            <div class="tab-content" id="tab-phrases">
-                <div id="phrases-container"></div>
-                <button class="q-btn accept" id="add-phrase-btn"
-                    style="width:100%; margin-top:10px; height:36px;">
-                    <i class="fas fa-plus"></i> 添加新阶段语录
+                </span>
+                <button type="button" class="act-open-quest-editor"
+                    style="width:26px; height:26px; padding:0; margin:0; flex:none;
+                           background:#27ae60; border:1px solid #2ecc71; color:#fff;
+                           display:flex; align-items:center; justify-content:center;
+                           border-radius:4px; font-size:1em; cursor:pointer; line-height:1;">
+                    <i class="fas fa-plus"></i>
                 </button>
             </div>
-        </div>`,
+
+            <div style="background:#222; padding:10px; border:1px solid #444;
+                 border-top:none; border-radius:0 0 4px 4px;
+                 min-height:250px; max-height:500px; overflow-y:auto;">
+                <div id="board-container"></div>
+            </div>`,
         buttons: {},
         close:   () => { delete globalThis.npcActivePanels[npcId]; },
         render:  (html) => _bindDMPanelEvents(html, {
@@ -358,12 +350,40 @@ function _bindDMPanelEvents(html, ctx) {
         updateAffectionUI(getCurrentAff());
     });
 
-    // ── 标签页切换 ────────────────────────────────────────────
-    html.find(".tab-btn").click(function () {
-        html.find(".tab-btn").removeClass("active");
-        html.find(".tab-content").removeClass("active");
-        $(this).addClass("active");
-        html.find(`#tab-${$(this).data("tab")}`).addClass("active");
+    // ── 加号按钮：呼出全屏新建任务窗口 ──────────────────────
+    html.find(".act-open-quest-editor").on("click", () => {
+        const pcActors2    = game.actors.filter(a => a.type === "character");
+        const partyActors2 = game.actors.filter(a =>
+            a.type === "party" || a.type === "group" ||
+            a.name === "组"    || a.name === "Party"
+        );
+        const targetOptions2 =
+            partyActors2.map(p =>
+                `<option value="${p.id}" style="color:#2ecc71;font-weight:bold;">👥 ${p.name}</option>`
+            ).join("") +
+            `<option value="ALL" style="font-weight:bold;color:#3498db;">全体玩家分别发放</option>` +
+            pcActors2.map(a =>
+                `<option value="${a.id}">👤 ${a.name}</option>`
+            ).join("");
+        const shareCbsHtml2 = factionMembers.length > 0
+            ? factionMembers.map(m =>
+                `<label style="display:flex;align-items:center;background:#111;
+                     padding:4px 8px;border-radius:3px;border:1px solid #444;
+                     cursor:pointer;margin:0;color:#eee;font-size:0.95em;">
+                    <input type="checkbox" class="share-cb" value="${m.id}"
+                        style="width:16px;height:16px;margin:0 6px 0 0;
+                               -webkit-appearance:checkbox;appearance:checkbox;">
+                    ${m.name}
+                </label>`
+            ).join("")
+            : `<span style="color:#777;font-style:italic;">该NPC没有同派系成员可共享。</span>`;
+        _openQuestEditorWindow(null, {
+            npcId, targetNPC, factionMembers, allNpcsRaw,
+            repData, questsData, goldScaling, systemPresets,
+            targetOptions: targetOptions2,
+            shareCbsHtml:  shareCbsHtml2,
+            onSaved: () => updateAffectionUI(getCurrentAff())
+        });
     });
 
     // ── 打开角色卡 ────────────────────────────────────────────
@@ -522,49 +542,6 @@ function _bindDMPanelEvents(html, ctx) {
         }).render(true);
     });
 
-    // ── 互动语录 ──────────────────────────────────────────────
-    const renderPhrases = () => {
-        targetNPC.phrases.sort((a, b) => b.minAff - a.minAff);
-        const pList = targetNPC.phrases.map((p, i) => `
-            <div class="phrase-row"
-                style="display:flex; gap:5px; margin-bottom:8px; align-items:center;">
-                <input type="number" class="p-min" value="${p.minAff}"
-                    style="width:60px; height:32px; background:#000; color:#fff;
-                           border:1px solid #555; padding:0 8px; box-sizing:border-box;">
-                <input type="text" class="p-text" value="${p.text}"
-                    style="flex:1; height:32px; background:#000; color:#fff;
-                           border:1px solid #555; padding:0 8px; box-sizing:border-box;">
-                <button class="q-btn fail p-del" data-idx="${i}"
-                    style="flex:0 0 35px; height:32px; padding:0; margin:0;">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>`
-        ).join("");
-        html.find("#phrases-container").html(pList);
-
-        html.find(".p-min, .p-text").on("change", async function () {
-            const idx = $(this).closest(".phrase-row").find(".p-del").data("idx");
-            targetNPC.phrases[idx].minAff =
-                parseInt($(this).closest(".phrase-row").find(".p-min").val()) || 0;
-            targetNPC.phrases[idx].text =
-                $(this).closest(".phrase-row").find(".p-text").val();
-            await saveRepData(repData);
-        });
-
-        html.find(".p-del").off("click").click(async function () {
-            targetNPC.phrases.splice($(this).data("idx"), 1);
-            await saveRepData(repData);
-            renderPhrases();
-        });
-    };
-    renderPhrases();
-
-    html.find("#add-phrase-btn").click(async () => {
-        targetNPC.phrases.push({ minAff: 0, text: "新的互动语录..." });
-        await saveRepData(repData);
-        renderPhrases();
-    });
-
     // ── NPC个体备份 ───────────────────────────────────────────
     html.on("click", ".act-backup-sys", () =>
         _openNpcBackupPanel(targetNPC, repData, questsData, npcId, app, allNpcsRaw)
@@ -615,9 +592,7 @@ function _bindDMPanelEvents(html, ctx) {
 
         await saveQuests(questsData);
         ui.notifications.success("任务已存入");
-        fillForm(html, null, factionMembers, allNpcsRaw);
         updateAffectionUI(getCurrentAff());
-        html.find(".tab-btn[data-tab='board']").click();
     });
 
     // ── 任务板初始事件绑定 ────────────────────────────────────
@@ -853,7 +828,39 @@ function _bindBoardEvents(html, ctx, updateAffectionUI) {
     // 编辑
     html.find(".act-edit-q").off("click").on("click", function () {
         const q = questsData.find(x => x.id === $(this).closest(".quest-card").data("qid"));
-        fillForm(html, q, factionMembers, allNpcsRaw);
+        if (!q) return;
+        const pcActors2    = game.actors.filter(a => a.type === "character");
+        const partyActors2 = game.actors.filter(a =>
+            a.type === "party" || a.type === "group" ||
+            a.name === "组"    || a.name === "Party"
+        );
+        const targetOptions2 =
+            partyActors2.map(p =>
+                `<option value="${p.id}" style="color:#2ecc71;font-weight:bold;">👥 ${p.name}</option>`
+            ).join("") +
+            `<option value="ALL" style="font-weight:bold;color:#3498db;">全体玩家分别发放</option>` +
+            pcActors2.map(a =>
+                `<option value="${a.id}">👤 ${a.name}</option>`
+            ).join("");
+        const shareCbsHtml2 = factionMembers.length > 0
+            ? factionMembers.map(m =>
+                `<label style="display:flex;align-items:center;background:#111;
+                     padding:4px 8px;border-radius:3px;border:1px solid #444;
+                     cursor:pointer;margin:0;color:#eee;font-size:0.95em;">
+                    <input type="checkbox" class="share-cb" value="${m.id}"
+                        style="width:16px;height:16px;margin:0 6px 0 0;
+                               -webkit-appearance:checkbox;appearance:checkbox;">
+                    ${m.name}
+                </label>`
+            ).join("")
+            : `<span style="color:#777;font-style:italic;">该NPC没有同派系成员可共享。</span>`;
+        _openQuestEditorWindow(q, {
+            npcId, targetNPC, factionMembers, allNpcsRaw,
+            repData, questsData, goldScaling, systemPresets,
+            targetOptions: targetOptions2,
+            shareCbsHtml:  shareCbsHtml2,
+            onSaved: () => updateAffectionUI(getCurrentAff())
+        });
     });
 
     // 删除
@@ -1274,7 +1281,6 @@ async function _applyDetailedAffection(npcObj, affData, reason, repData) {
     if (!npcObj || !affData) return;
     let changed = false;
 
-    // 找派系
     let factionId = "ind";
     for (const [fid, fData] of Object.entries(repData.factions)) {
         if (fid.startsWith("-=")) continue;
@@ -1285,7 +1291,6 @@ async function _applyDetailedAffection(npcObj, affData, reason, repData) {
     }
     console.log(`[联动调试] NPC:${npcObj.name} 派系:${factionId} affData:`, JSON.stringify(affData));
 
-    // 全局声望
     if (affData.global !== 0) {
         const oldVal = npcObj.affection || 0;
         const newVal = oldVal + affData.global;
@@ -1300,9 +1305,10 @@ async function _applyDetailedAffection(npcObj, affData, reason, repData) {
         await propagateFactionLinkage(npcObj, "global", affData.global, reason, factionId, repData);
     }
 
-    // 玩家个人声望
     for (const [pcid, val] of Object.entries(affData.pcs || {})) {
         if (val !== 0) {
+            const actor = game.actors.get(pcid);
+            if (!actor || actor.type.match(/party|group/i)) continue;
             npcObj.playerAffection       ??= {};
             npcObj.playerAffection[pcid] ??= { affection: 0, history: [] };
             const oldVal = npcObj.playerAffection[pcid].affection || 0;
@@ -1327,11 +1333,10 @@ async function _pushAffectionUpdate(val, isSetTo, applyAllPcs, reason,
     const npcObj = explicitNpc || targetNPC;
 
     const targets = applyAllPcs
-        ? ["global", ...game.actors.filter(a =>
-            a.type === "character" || a.type.match(/party|group/i)).map(a => a.id)]
+        ? ["global", ...game.actors.filter(a => a.type === "character").map(a => a.id)]
         : [currentAffTarget];
 
-    let globalChangeAmt = 0;  // ← 在这里声明，修复 ReferenceError
+    let globalChangeAmt = 0;
 
     for (const tId of [...new Set(targets)]) {
         const oldVal    = tId === "global"
@@ -1355,6 +1360,8 @@ async function _pushAffectionUpdate(val, isSetTo, applyAllPcs, reason,
             npcObj.history.push(histEntry);
             globalChangeAmt = changeAmt;  // ← 记录全局变动量
         } else {
+            const tActor = game.actors.get(tId);
+            if (!tActor || tActor.type.match(/party|group/i)) continue;
             npcObj.playerAffection       ??= {};
             npcObj.playerAffection[tId]  ??= { affection: 0, history: [] };
             npcObj.playerAffection[tId].affection = newVal;
@@ -1578,6 +1585,98 @@ function _openNpcBackupPanel(targetNPC, repData, questsData, npcId, app, allNpcs
         }
     });
     bd.render(true);
+}
+
+// ─── 全屏任务编辑器窗口 ───────────────────────────────────────
+
+function _openQuestEditorWindow(q, ctx) {
+    const {
+        npcId, targetNPC, factionMembers, allNpcsRaw,
+        repData, questsData, goldScaling, systemPresets,
+        targetOptions, shareCbsHtml, onSaved
+    } = ctx;
+
+    const isNew     = !q;
+    const editorHTML = buildQuestEditorHTML(
+        systemPresets, factionMembers, targetOptions, shareCbsHtml
+    );
+
+    class QuestEditorApp extends Application {
+        static get defaultOptions() {
+            return foundry.utils.mergeObject(super.defaultOptions, {
+                id:        `dm-quest-editor-${foundry.utils.randomID()}`,
+                title:     isNew ? `新建任务 — ${targetNPC.name}` : `编辑任务：${q?.name}`,
+                width:     700,
+                height:    "auto",
+                resizable: true,
+                classes:   ["npc-panel"]
+            });
+        }
+
+        async _renderInner(_data) {
+            return $(`<div style="padding:12px; background:#1a1a1a;">${editorHTML}</div>`);
+        }
+
+        activateListeners(html) {
+            super.activateListeners(html);
+
+            fillForm(html, q ?? null, factionMembers, allNpcsRaw);
+
+            bindQuestEditorEvents(html, {
+                targetNPC, allNpcsRaw, factionMembers, questsData,
+                repData, goldScaling,
+                getCurrentAff: () => targetNPC.affection || 0,
+                refreshBoard:  () => {},
+                syncJournalForNPC: () => {}
+            });
+
+            html.find("#act-save-quest").on("click", async () => {
+                const formData = getCurrentFormData(html);
+                if (!formData.name)
+                    return ui.notifications.warn("请输入任务名称。");
+                if (!formData.targetId)
+                    return ui.notifications.warn("请至少指定一个分配目标。");
+                if (!formData.phases?.length)
+                    return ui.notifications.warn("请至少添加一个阶段。");
+
+                const qid = formData.id || foundry.utils.randomID();
+                const ex  = questsData.find(x => x.id === qid);
+                const questObj = {
+                    ...formData,
+                    id:           qid,
+                    npcId:        targetNPC.id,
+                    status:       isNew ? "avail" : (ex?.status ?? "avail"),
+                    timeAccept:   ex?.timeAccept   ?? null,
+                    timeComplete: ex?.timeComplete ?? null,
+                    timeFail:     ex?.timeFail     ?? null,
+                    appliedAffection: ex?.appliedAffection ?? null,
+                    payHistory:   ex?.payHistory   ?? [],
+                    lastPayTime:  ex?.lastPayTime  ?? null,
+                    currentPhase: ex?.currentPhase ?? 0
+                };
+
+                if (isNew) questsData.push(questObj);
+                else {
+                    const idx = questsData.findIndex(x => x.id === qid);
+                    if (idx > -1) questsData[idx] = questObj;
+                }
+
+                await saveQuests(questsData);
+                ui.notifications.success(
+                    isNew ? `任务「${questObj.name}」已创建。`
+                          : `任务「${questObj.name}」已保存。`
+                );
+                this.close();
+                if (onSaved) onSaved();
+            });
+
+            html.find("#act-cancel-edit").on("click", () => {
+                fillForm(html, null, factionMembers, allNpcsRaw);
+            });
+        }
+    }
+
+    new QuestEditorApp().render(true);
 }
 
 // ─── 同步世界日志 ─────────────────────────────────────────────
