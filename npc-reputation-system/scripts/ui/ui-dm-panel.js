@@ -19,6 +19,7 @@ import {
     buildQuestEditorHTML, bindQuestEditorEvents,
     fillForm, getCurrentFormData, renderPhases, renderTargetTags
 } from "./ui-quest-editor.js";
+import { propagateFactionLinkage } from "../reputation-linkage.js";
 
 // 记录当前打开的面板实例（供 npc-receiver.js 调用 refreshBoard）
 globalThis.npcActivePanels = globalThis.npcActivePanels || {};
@@ -1269,24 +1270,37 @@ async function _distributeRewards(q, phase, targetActors, isMultiPrivate, curren
 }
 
 async function _applyDetailedAffection(npcObj, affData, reason, repData) {
+    console.log("[测试] _applyDetailedAffection 被调用", npcObj?.name, affData);
     if (!npcObj || !affData) return;
     let changed = false;
 
+    // 找派系
+    let factionId = "ind";
+    for (const [fid, fData] of Object.entries(repData.factions)) {
+        if (fid.startsWith("-=")) continue;
+        if (fData?.members?.find(m => m.id === npcObj.id)) {
+            factionId = fid;
+            break;
+        }
+    }
+    console.log(`[联动调试] NPC:${npcObj.name} 派系:${factionId} affData:`, JSON.stringify(affData));
+
+    // 全局声望
     if (affData.global !== 0) {
         const oldVal = npcObj.affection || 0;
         const newVal = oldVal + affData.global;
         npcObj.affection = newVal;
         npcObj.history ??= [];
         npcObj.history.push({
-            date:   getWorldTimeString(),
-            old:    oldVal,
-            new:    newVal,
-            change: affData.global,
-            reason
+            date: getWorldTimeString(), old: oldVal, new: newVal,
+            change: affData.global, reason
         });
         changed = true;
+
+        await propagateFactionLinkage(npcObj, "global", affData.global, reason, factionId, repData);
     }
 
+    // 玩家个人声望
     for (const [pcid, val] of Object.entries(affData.pcs || {})) {
         if (val !== 0) {
             npcObj.playerAffection       ??= {};
@@ -1298,6 +1312,8 @@ async function _applyDetailedAffection(npcObj, affData, reason, repData) {
                 date: getWorldTimeString(), old: oldVal, new: newVal, change: val, reason
             });
             changed = true;
+
+            await propagateFactionLinkage(npcObj, pcid, val, reason, factionId, repData);
         }
     }
 
@@ -1315,10 +1331,12 @@ async function _pushAffectionUpdate(val, isSetTo, applyAllPcs, reason,
             a.type === "character" || a.type.match(/party|group/i)).map(a => a.id)]
         : [currentAffTarget];
 
+    let globalChangeAmt = 0;  // ← 在这里声明，修复 ReferenceError
+
     for (const tId of [...new Set(targets)]) {
         const oldVal    = tId === "global"
             ? (npcObj.affection || 0)
-            : (npcObj.playerAffection[tId]?.affection || 0);
+            : (npcObj.playerAffection?.[tId]?.affection || 0);
         const newVal    = isSetTo ? val : (oldVal + val);
         const changeAmt = newVal - oldVal;
         if (changeAmt === 0) continue;
@@ -1333,20 +1351,38 @@ async function _pushAffectionUpdate(val, isSetTo, applyAllPcs, reason,
 
         if (tId === "global") {
             npcObj.affection = newVal;
+            npcObj.history   ??= [];
             npcObj.history.push(histEntry);
+            globalChangeAmt = changeAmt;  // ← 记录全局变动量
         } else {
-            npcObj.playerAffection[tId] ??= { affection: 0, history: [] };
+            npcObj.playerAffection       ??= {};
+            npcObj.playerAffection[tId]  ??= { affection: 0, history: [] };
             npcObj.playerAffection[tId].affection = newVal;
             npcObj.playerAffection[tId].history.push(histEntry);
+
+            // pcs 也触发联动
+            if (!isLinkage) {
+                await propagateFactionLinkage(
+                    npcObj, tId, changeAmt, reason, targetFactionId ?? "ind", repData
+                );
+            }
         }
     }
 
     await saveRepData(repData);
+
+    // 全局联动
+    if (globalChangeAmt !== 0 && !isLinkage) {
+        await propagateFactionLinkage(
+            npcObj, "global", globalChangeAmt, reason, targetFactionId ?? "ind", repData
+        );
+    }
+
     if (!explicitNpc) {
         updateAffectionUI(
             currentAffTarget === "global"
                 ? (targetNPC.affection || 0)
-                : (targetNPC.playerAffection[currentAffTarget]?.affection || 0)
+                : (targetNPC.playerAffection?.[currentAffTarget]?.affection || 0)
         );
         if (applyAllPcs) html.find("#apply-all-pcs").prop("checked", false);
     }
