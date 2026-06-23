@@ -106,6 +106,9 @@ export function getRepData() {
     };
     data.settings.questPresets       ??= [];
     data.settings.rewardPresets      ??= [];
+    data.settings.sidebarFactionOrder ??= null;
+    data.settings.sidebarNpcOrders   ??= {};
+    data.settings.questOrder         ??= [];
 
     return data;
 }

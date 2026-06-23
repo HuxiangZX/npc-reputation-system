@@ -222,12 +222,12 @@ async function _playerOpenPanel() {
         return;
     }
 
-    // ── 玩家：悬停Token打开窗口化互动面板 ────────────────────
+    // ── 玩家：悬停Token打开互动面板；无Token则打开全屏任务总览 ──
     const hovered = canvas.tokens?.hover;
     if (!hovered) {
-        return ui.notifications.warn(
-            "请将鼠标移到 NPC Token 上再按快捷键。"
-        );
+        const { openQuestFullscreen } = await import("./ui/ui-quest-fullscreen.js");
+        openQuestFullscreen();
+        return;
     }
 
     const match = allNpcs.find(n => n.actorId === hovered.actor?.id);

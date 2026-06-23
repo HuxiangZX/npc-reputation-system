@@ -143,7 +143,7 @@ export function buildQuestEditorHTML(
         <label class="edit-q-cb-wrap"
             style="color:#e67e22;font-weight:bold;margin-top:0;">
             <input type="checkbox" id="edit-q-periodic">
-            开启长线多阶段/周期发薪模式
+            长线周期发薪模式
         </label>
         <div id="periodic-settings" style="display:none;margin-top:8px;">
             <div style="display:flex;align-items:center;

@@ -429,3 +429,22 @@
 .qfs-act-btn.pay     { background:#2a1540; color:#c07fe0; }
 .qfs-act-btn.edit    { background:#1a2030; color:#6090c0; }
 .qfs-act-btn.del     { background:#2a1010; color:#b05050; }
+
+.qfs-faction-draggable.qfs-drag-over {
+    border-top: 2px solid #3498db;
+}
+.qfs-npc-row.qfs-drag-over {
+    background: #1b2838 !important;
+    border-left-color: #3498db !important;
+}
+.qfs-card-drag-over {
+    border-top-color: #f1c40f !important;
+    box-shadow: 0 0 8px rgba(241,196,15,0.4) !important;
+}
+.qfs-npc-grip {
+    opacity: 0.4;
+    transition: opacity 0.15s;
+}
+.qfs-npc-row:hover .qfs-npc-grip {
+    opacity: 1;
+}

@@ -184,10 +184,14 @@ class QuestFullscreen {
     // 侧边栏
     // ══════════════════════════════════════════════════════════
 
-   _renderSidebar() {
+    _renderSidebar() {
         const sb   = this._el.find("#qfs-sidebar");
         const data = this._repData;
-        const factionOrder = data.factionOrder ?? Object.keys(data.factions ?? {});
+
+        const sidebarFactionOrder = data.settings?.sidebarFactionOrder
+            ?? data.factionOrder
+            ?? Object.keys(data.factions ?? {});
+        const sidebarNpcOrders = data.settings?.sidebarNpcOrders ?? {};
 
         const totalQ    = this._isGM ? this._quests : this._filterForPlayer(this._quests);
         const totalCnt  = totalQ.length;
@@ -198,7 +202,7 @@ class QuestFullscreen {
             <i class="fas fa-scroll" style="color:#3498db;"></i>
             <span style="color:#3498db; font-weight:bold;">任务管理</span>
         </div>
-        <div class="qfs-sb-scroll">
+        <div class="qfs-sb-scroll" id="qfs-sb-scroll-inner">
             <div class="qfs-npc-row ${this._activeNpcId === null ? "active" : ""}" data-npcid="__ALL__">
                 <div class="qfs-npc-avatar-placeholder">
                     <i class="fas fa-layer-group"></i>
@@ -212,45 +216,74 @@ class QuestFullscreen {
                     ${totalCnt > 0 ? `<span class="qfs-dot total">${totalCnt}</span>` : ""}
                 </div>
             </div>
-            <div class="qfs-sb-divider"></div>`;
+            <div class="qfs-sb-divider"></div>
+            <div id="qfs-faction-sort-container">`;
 
-        for (const fid of factionOrder) {
+        for (const fid of sidebarFactionOrder) {
             const f = data.factions[fid];
             if (!f?.members?.length) continue;
             const expanded = this._expandedFids.has(fid);
+
+            const memberOrder = sidebarNpcOrders[fid] ?? f.members.map(m => m.id);
+            const orderedMembers = [];
+            for (const mid of memberOrder) {
+                const m = f.members.find(x => x.id === mid);
+                if (m) orderedMembers.push(m);
+            }
+            for (const m of f.members) {
+                if (!orderedMembers.find(x => x.id === m.id)) orderedMembers.push(m);
+            }
+
             html += `
-            <div class="qfs-faction-block">
+            <div class="qfs-faction-block qfs-faction-draggable" data-fid="${fid}"
+                draggable="${this._isGM ? 'true' : 'false'}">
                 <div class="qfs-faction-header" data-fid="${fid}">
+                    ${this._isGM ? `<i class="fas fa-grip-vertical" style="color:#444;font-size:0.75em;margin-right:4px;cursor:grab;"></i>` : ""}
                     <i class="fas fa-chevron-${expanded ? "down" : "right"} qfs-fchev"></i>
                     <img src="${f.img || "icons/svg/item-bag.svg"}" class="qfs-faction-icon">
                     <span class="qfs-faction-name">${f.name}</span>
                     <span class="qfs-faction-count">${f.members.length}</span>
                 </div>
-                <div class="qfs-faction-members" ${expanded ? "" : "style=\"display:none\""}>
-                    ${f.members.map(n => this._buildNpcRow(n)).join("")}
+                <div class="qfs-faction-members" data-fid="${fid}" ${expanded ? "" : "style=\"display:none\""}>
+                    ${orderedMembers.map(n => this._buildNpcRow(n, true)).join("")}
                 </div>
             </div>`;
         }
 
         if (data.independent?.length > 0) {
             const expanded = this._expandedFids.has("ind");
+            const memberOrder = sidebarNpcOrders["ind"] ?? data.independent.map(m => m.id);
+            const orderedInd = [];
+            for (const mid of memberOrder) {
+                const m = data.independent.find(x => x.id === mid);
+                if (m) orderedInd.push(m);
+            }
+            for (const m of data.independent) {
+                if (!orderedInd.find(x => x.id === m.id)) orderedInd.push(m);
+            }
+
             html += `
-            <div class="qfs-faction-block">
+            <div class="qfs-faction-block" data-fid="ind">
                 <div class="qfs-faction-header" data-fid="ind">
                     <i class="fas fa-chevron-${expanded ? "down" : "right"} qfs-fchev"></i>
                     <span class="qfs-faction-name" style="margin-left:4px;">独立 NPC</span>
                     <span class="qfs-faction-count">${data.independent.length}</span>
                 </div>
-                <div class="qfs-faction-members" ${expanded ? "" : "style=\"display:none\""}>
-                    ${data.independent.map(n => this._buildNpcRow(n)).join("")}
+                <div class="qfs-faction-members" data-fid="ind" ${expanded ? "" : "style=\"display:none\""}>
+                    ${orderedInd.map(n => this._buildNpcRow(n, true)).join("")}
                 </div>
             </div>`;
         }
 
-        html += `</div>`;
+        html += `</div></div>`;
         sb.html(html);
 
+        if (this._isGM) {
+            this._bindSidebarDragSort(sb);
+        }
+
         sb.find(".qfs-faction-header").on("click", (e) => {
+            if ($(e.target).closest(".fas.fa-grip-vertical").length) return;
             const fid     = $(e.currentTarget).data("fid");
             const members = $(e.currentTarget).next(".qfs-faction-members");
             const chev    = $(e.currentTarget).find(".qfs-fchev");
@@ -279,16 +312,22 @@ class QuestFullscreen {
         });
     }
 
-    _buildNpcRow(npc) {
+    _buildNpcRow(npc, showHandle = false) {
         const qs = this._quests.filter(q =>
             q.npcId === npc.id || q.sharedWith?.includes(npc.id));
         const visibleQs = this._isGM ? qs : this._filterForPlayer(qs);
-        const total     = visibleQs.length;
-        const active    = visibleQs.filter(q => q.status === "active").length;
-        const isActive  = this._activeNpcId === npc.id;
+        if (!this._isGM && visibleQs.length === 0) return "";
+        const total  = visibleQs.length;
+        const active = visibleQs.filter(q => q.status === "active").length;
+        const isActive = this._activeNpcId === npc.id;
 
         return `
-        <div class="qfs-npc-row ${isActive ? "active" : ""}" data-npcid="${npc.id}">
+        <div class="qfs-npc-row ${isActive ? "active" : ""}" data-npcid="${npc.id}"
+            draggable="${this._isGM && showHandle ? 'true' : 'false'}">
+            ${this._isGM && showHandle
+                ? `<i class="fas fa-grip-vertical qfs-npc-grip"
+                      style="color:#333;font-size:0.75em;margin-right:2px;cursor:grab;flex:none;"></i>`
+                : ""}
             <img src="${npc.img}" class="qfs-npc-avatar">
             <div class="qfs-npc-info">
                 <div class="qfs-npc-name">${npc.name}</div>
@@ -299,6 +338,149 @@ class QuestFullscreen {
                 ${total > 0 ? `<span class="qfs-dot total">${total}</span>` : ""}
             </div>
         </div>`;
+    }
+
+    _bindSidebarDragSort(sb) {
+        let dragSrc  = null;
+        let dragType = null;
+
+        const container = sb.find("#qfs-faction-sort-container")[0];
+
+        // ── 派系拖拽 ──────────────────────────────────────────
+        sb.find(".qfs-faction-draggable").each((_, el) => {
+            el.addEventListener("dragstart", (e) => {
+                const target = e.target;
+                if ($(target).closest(".qfs-npc-row").length) return;
+                dragSrc  = el;
+                dragType = "faction";
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", "faction");
+                setTimeout(() => el.style.opacity = "0.4", 0);
+                e.stopPropagation();
+            });
+
+            el.addEventListener("dragend", () => {
+                el.style.opacity = "1";
+                sb.find(".qfs-faction-draggable").css("border-top", "").css("border-bottom", "");
+                if (dragType === "faction") this._saveFactionOrder(sb);
+                dragSrc = null; dragType = null;
+            });
+
+            el.addEventListener("dragover", (e) => {
+                if (dragType !== "faction" || !dragSrc || el === dragSrc) return;
+                if ($(e.target).closest(".qfs-npc-row").length) return;
+                e.preventDefault();
+                e.stopPropagation();
+                sb.find(".qfs-faction-draggable").css("border-top", "").css("border-bottom", "");
+                const rect = el.getBoundingClientRect();
+                if (e.clientY < rect.top + rect.height / 2) {
+                    el.style.borderTop = "2px solid #3498db";
+                } else {
+                    el.style.borderBottom = "2px solid #3498db";
+                }
+            });
+
+            el.addEventListener("dragleave", (e) => {
+                if (!el.contains(e.relatedTarget)) {
+                    el.style.borderTop = "";
+                    el.style.borderBottom = "";
+                }
+            });
+
+            el.addEventListener("drop", (e) => {
+                if (dragType !== "faction" || !dragSrc || el === dragSrc) return;
+                if ($(e.target).closest(".qfs-npc-row").length) return;
+                e.preventDefault();
+                e.stopPropagation();
+                el.style.borderTop = "";
+                el.style.borderBottom = "";
+                const rect = el.getBoundingClientRect();
+                if (e.clientY < rect.top + rect.height / 2) {
+                    container.insertBefore(dragSrc, el);
+                } else {
+                    container.insertBefore(dragSrc, el.nextSibling);
+                }
+            });
+        });
+
+        // ── NPC 拖拽 ──────────────────────────────────────────
+        sb.find(".qfs-faction-members").each((_, membersEl) => {
+            $(membersEl).find(".qfs-npc-row").each((_, rowEl) => {
+                rowEl.addEventListener("dragstart", (e) => {
+                    dragSrc  = rowEl;
+                    dragType = "npc";
+                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData("text/plain",
+                        "npc:" + $(rowEl).data("npcid") + ":" + $(membersEl).data("fid"));
+                    setTimeout(() => rowEl.style.opacity = "0.4", 0);
+                    e.stopPropagation();
+                });
+
+                rowEl.addEventListener("dragend", () => {
+                    rowEl.style.opacity = "1";
+                    sb.find(".qfs-npc-row").css("border-top", "").css("border-bottom", "");
+                    if (dragType === "npc") this._saveNpcOrder(sb);
+                    dragSrc = null; dragType = null;
+                });
+
+                rowEl.addEventListener("dragover", (e) => {
+                    if (dragType !== "npc" || !dragSrc || rowEl === dragSrc) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    sb.find(".qfs-npc-row").css("border-top", "").css("border-bottom", "");
+                    const rect = rowEl.getBoundingClientRect();
+                    if (e.clientY < rect.top + rect.height / 2) {
+                        rowEl.style.borderTop = "2px solid #3498db";
+                    } else {
+                        rowEl.style.borderBottom = "2px solid #3498db";
+                    }
+                });
+
+                rowEl.addEventListener("dragleave", (e) => {
+                    if (!rowEl.contains(e.relatedTarget)) {
+                        rowEl.style.borderTop = "";
+                        rowEl.style.borderBottom = "";
+                    }
+                });
+
+                rowEl.addEventListener("drop", (e) => {
+                    if (dragType !== "npc" || !dragSrc || rowEl === dragSrc) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    rowEl.style.borderTop = "";
+                    rowEl.style.borderBottom = "";
+                    const rect = rowEl.getBoundingClientRect();
+                    if (e.clientY < rect.top + rect.height / 2) {
+                        membersEl.insertBefore(dragSrc, rowEl);
+                    } else {
+                        membersEl.insertBefore(dragSrc, rowEl.nextSibling);
+                    }
+                });
+            });
+        });
+    }
+
+    async _saveFactionOrder(sb) {
+        const newOrder = [];
+        sb.find("#qfs-faction-sort-container .qfs-faction-draggable").each(function () {
+            newOrder.push($(this).data("fid"));
+        });
+        this._repData.settings.sidebarFactionOrder = newOrder;
+        await saveRepData(this._repData);
+    }
+
+    async _saveNpcOrder(sb) {
+        const orders = {};
+        sb.find(".qfs-faction-members").each(function () {
+            const fid = $(this).data("fid");
+            const ids = [];
+            $(this).find(".qfs-npc-row").each(function () {
+                ids.push(String($(this).data("npcid")));
+            });
+            orders[fid] = ids;
+        });
+        this._repData.settings.sidebarNpcOrders = orders;
+        await saveRepData(this._repData);
     }
 
     _renderToolbar() {
@@ -395,10 +577,14 @@ class QuestFullscreen {
                 q.sharedWith?.includes(this._activeNpcId));
         }
 
-        if (!this._isGM) quests = this._filterForPlayer(quests);
-
-        if (this._activeStatus !== "all")
-            quests = quests.filter(q => q.status === this._activeStatus);
+        if (!this._isGM) {
+            quests = this._filterForPlayer(quests);
+            if (this._activeStatus !== "all")
+                quests = quests.filter(q => q.status === this._activeStatus);
+        } else {
+            if (this._activeStatus !== "all")
+                quests = quests.filter(q => q.status === this._activeStatus);
+        }
 
         if (this._searchText.trim()) {
             const kw = this._searchText.trim().toLowerCase();
@@ -432,26 +618,63 @@ class QuestFullscreen {
         this._el.find("#qfs-content").html(html);
         this._bindCardEvents();
     }
-
+    
     _buildGroupedContent(quests) {
+        const data = this._repData;
+        const sidebarFactionOrder = data.settings?.sidebarFactionOrder
+            ?? data.factionOrder
+            ?? Object.keys(data.factions ?? {});
+        const sidebarNpcOrders = data.settings?.sidebarNpcOrders ?? {};
+
+        const orderedNpcIds = [];
+        for (const fid of sidebarFactionOrder) {
+            const f = data.factions[fid];
+            if (!f?.members?.length) continue;
+            const memberOrder = sidebarNpcOrders[fid] ?? f.members.map(m => m.id);
+            const ordered = [];
+            for (const mid of memberOrder) {
+                if (f.members.find(m => m.id === mid)) ordered.push(mid);
+            }
+            for (const m of f.members) {
+                if (!ordered.includes(m.id)) ordered.push(m.id);
+            }
+            orderedNpcIds.push(...ordered);
+        }
+        const indOrder = sidebarNpcOrders["ind"]
+            ?? (data.independent?.map(m => m.id) ?? []);
+        for (const mid of indOrder) {
+            if (data.independent?.find(m => m.id === mid)) orderedNpcIds.push(mid);
+        }
+        if (data.independent) {
+            for (const m of data.independent) {
+                if (!orderedNpcIds.includes(m.id)) orderedNpcIds.push(m.id);
+            }
+        }
+
         const groups = new Map();
         for (const q of quests) {
             if (!groups.has(q.npcId)) groups.set(q.npcId, []);
             groups.get(q.npcId).push(q);
         }
+
+        const sortedKeys = [...groups.keys()].sort((a, b) => {
+            const ia = orderedNpcIds.indexOf(a);
+            const ib = orderedNpcIds.indexOf(b);
+            if (ia === -1 && ib === -1) return 0;
+            if (ia === -1) return 1;
+            if (ib === -1) return -1;
+            return ia - ib;
+        });
+
         let html = "";
-        for (const [nid, qs] of groups) {
+        for (const nid of sortedKeys) {
+            const qs     = groups.get(nid);
             const npcObj = this._allNpcs.find(n => n.id === nid);
             html += `
             <div class="qfs-group">
                 <div class="qfs-group-header">
-                    ${npcObj?.img
-                        ? `<img src="${npcObj.img}"
-                               class="qfs-group-avatar">`
-                        : ""}
-                    <span class="qfs-group-name">
-                        ${npcObj?.name ?? "未知NPC"}
-                    </span>
+                    ${npcObj?.img ? `<img src="${npcObj.img}" class="qfs-group-avatar">` : ""}
+                    <span class="qfs-group-name">${npcObj?.name ?? "未知NPC"}</span>
                     <span class="qfs-group-count">${qs.length} 条</span>
                 </div>
                 <div class="qfs-grid qfs-grid-inner">
@@ -472,8 +695,6 @@ class QuestFullscreen {
                 a.testUserPermission(game.user, "OWNER"))
             .map(a => a.id);
         return quests.filter(q => {
-            if (!["active", "done", "failed"].includes(q.status))
-                return false;
             if (q.targetId === "ALL") return true;
             const tIds = q.targetId?.split(",") ?? [];
             return tIds.includes(myId) ||
@@ -589,15 +810,13 @@ class QuestFullscreen {
                 ${timelineItems.join("")}</div>`
             : "";
 
+        const isLastPhase = !q.phases ||
+            q.phases.length <= 1 ||
+            cp >= q.phases.length - 1;
+
         // 操作按钮
         let actionBtns = "";
         if (this._isGM) {
-            const isShared    = q.npcId !== this._activeNpcId
-                && this._activeNpcId !== null;
-            const isLastPhase = !q.phases ||
-                q.phases.length <= 1 ||
-                cp >= q.phases.length - 1;
-
             const isOwnedByActiveNpc = this._activeNpcId !== null
                 ? q.npcId === this._activeNpcId
                 : true;
@@ -657,6 +876,19 @@ class QuestFullscreen {
                     <i class="fas fa-trash"></i>
                 </button>` : ""}`;
             }
+
+        } else {
+            const myChar = game.user.character;
+            if (myChar && q.status === "active") {
+                const npcObj2 = this._allNpcs.find(n => n.id === q.npcId);
+                actionBtns = `
+                <button class="qfs-act-btn complete"
+                    data-action="pc-complete" data-qid="${q.id}"
+                    data-npcname="${npcObj2?.name ?? ""}"
+                    data-qname="${q.name}">
+                    <i class="fas fa-check-circle"></i> 申请结算
+                </button>`;
+            }
         }
 
         return `
@@ -685,6 +917,69 @@ class QuestFullscreen {
                 const qid    = String(btn.data("qid"));
                 await this._handleAction(action, qid);
             });
+
+        if (!this._isGM) return;
+
+        this._el.find(".qfs-card").each((_, cardEl) => {
+            cardEl.setAttribute("draggable", "true");
+
+            cardEl.addEventListener("dragstart", (e) => {
+                const qid = String($(cardEl).data("qid"));
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", "quest:" + qid);
+                setTimeout(() => cardEl.style.opacity = "0.5", 0);
+                e.stopPropagation();
+            });
+
+            cardEl.addEventListener("dragend", () => {
+                cardEl.style.opacity = "1";
+            });
+        });
+
+        this._el.find("#qfs-sb-scroll-inner .qfs-npc-row").each((_, rowEl) => {
+            const npcid = String($(rowEl).data("npcid"));
+            if (npcid === "__ALL__") return;
+
+            rowEl.addEventListener("dragover", (e) => {
+                if (!e.dataTransfer.types.includes("text/plain")) return;
+                e.preventDefault();
+                e.stopPropagation();
+                rowEl.style.background    = "#1b2838";
+                rowEl.style.borderLeft    = "3px solid #3498db";
+            });
+
+            rowEl.addEventListener("dragleave", (e) => {
+                if (!rowEl.contains(e.relatedTarget)) {
+                    rowEl.style.background = "";
+                    rowEl.style.borderLeft = "";
+                }
+            });
+
+            rowEl.addEventListener("drop", async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                rowEl.style.background = "";
+                rowEl.style.borderLeft = "";
+
+                const raw = e.dataTransfer.getData("text/plain");
+                if (!raw.startsWith("quest:")) return;
+                const qid = raw.replace("quest:", "");
+
+                this._quests = await getQuests();
+                const q = this._quests.find(x => x.id === qid);
+                if (!q || q.npcId === npcid) return;
+
+                const oldOwner = q.npcId;
+                q.sharedWith   = q.sharedWith ?? [];
+                if (!q.sharedWith.includes(oldOwner)) q.sharedWith.push(oldOwner);
+                q.npcId        = npcid;
+                q.sharedWith   = q.sharedWith.filter(id => id !== npcid);
+
+                await saveQuests(this._quests);
+                ui.notifications.success("任务已转移，原发布人作为共享方保留。");
+                await this._reload();
+            });
+        });
     }
 
     async _handleAction(action, qid) {
@@ -706,6 +1001,49 @@ class QuestFullscreen {
             case "reset":    await this._doReset(q);               break;
             case "edit":     await this._openQuestEditor(q);        break;
             case "delete":   this._confirmDelete(q);               break;
+                        case "pc-complete": {
+                const myChar = game.user.character;
+                if (!myChar) return;
+                const npcName = String($(
+                    `.qfs-act-btn[data-action="pc-complete"][data-qid="${qid}"]`
+                ).data("npcname") || "");
+                const qName   = String($(
+                    `.qfs-act-btn[data-action="pc-complete"][data-qid="${qid}"]`
+                ).data("qname") || q.name);
+                ChatMessage.create({
+                    speaker: ChatMessage.getSpeaker({ actor: myChar }),
+                    content: `
+                    <div style="background:rgba(0,0,0,0.5);border:1px solid #444;
+                         border-left:4px solid #3498db;padding:10px;border-radius:4px;">
+                        <h3 style="margin-top:0;color:#3498db;border-bottom:1px solid #333;
+                            padding-bottom:5px;">✅ 任务结算申请</h3>
+                        <p style="font-size:1.05em;color:#eee;margin-bottom:5px;">
+                            <b>${myChar.name}</b> 申请结算
+                            <b>${npcName}</b> 的委托：
+                        </p>
+                        <div style="background:#111;padding:8px;border-radius:4px;
+                            color:#2ecc71;font-weight:bold;text-align:center;
+                            font-size:1.1em;margin-bottom:12px;">
+                            「 ${qName} 」
+                        </div>
+                        <div class="dm-only-btn" style="text-align:center;
+                            border-top:1px dashed #555;padding-top:10px;">
+                            <button class="npc-quick-complete-btn"
+                                data-npcid="${q.npcId}"
+                                data-qid="${qid}"
+                                data-reqid="${game.user.id}"
+                                style="background:#3498db;border:1px solid #2980b9;
+                                       color:white;padding:6px;border-radius:4px;
+                                       cursor:pointer;font-size:0.95em;width:100%;
+                                       font-weight:bold;">
+                                <i class="fas fa-coins"></i> DM 一键批准结算
+                            </button>
+                        </div>
+                    </div>`
+                });
+                ui.notifications.success("结算申请已发送给 DM。");
+                break;
+            }
         }
     }
 
@@ -1226,17 +1564,15 @@ class QuestFullscreen {
             if (!actor) continue;
 
             if (actor.type.match(/party|group/i)) {
-                // 尝试获取 party 成员
-                const memberIds = actor.system?.members
-                    ?? [];
+                const memberIds = actor.system?.members ?? [];
                 if (memberIds.length > 0) {
                     for (const m of memberIds) {
                         const a = game.actors.get(m.id ?? m);
-                        if (a && !result.find(x => x.id === a.id))
+                        if (a && a.type === "character" &&
+                            !result.find(x => x.id === a.id))
                             result.push(a);
                     }
                 } else {
-                    // 回退：所有 character
                     game.actors
                         .filter(a => a.type === "character")
                         .forEach(a => {
@@ -1244,7 +1580,7 @@ class QuestFullscreen {
                                 result.push(a);
                         });
                 }
-            } else {
+            } else if (actor.type === "character") {
                 if (!result.find(x => x.id === actor.id))
                     result.push(actor);
             }

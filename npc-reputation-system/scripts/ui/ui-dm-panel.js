@@ -7,7 +7,7 @@
 
 import {
     getRepData, saveRepData,
-    getOrCreateQuestJournal, getQuests, saveQuests,
+    getQuests, saveQuests,
     findNPCById, getAllNPCs
 } from "../data-manager.js";
 import {
@@ -34,7 +34,6 @@ export async function openDMPanel(npcId, options = {}) {
 
     const repData      = getRepData();
     const questsData   = await getQuests();
-    const questJournal = await getOrCreateQuestJournal();
 
     const { npc: targetNPC, factionId: targetFactionId, factionName: targetFactionName } =
         findNPCById(repData, npcId);
@@ -74,10 +73,6 @@ export async function openDMPanel(npcId, options = {}) {
             q.status     = "active";
             q.timeAccept = getWorldTimeString();
             await saveQuests(questsData);
-            await _syncJournalForNPC(npcId, targetNPC, repData, questsData, allNpcsRaw, targetFactionName);
-            if (q.npcId !== npcId)
-                await _syncJournalForNPC(q.npcId, allNpcsRaw.find(n => n.id === q.npcId),
-                    repData, questsData, allNpcsRaw, "");
             ui.notifications.success("已批准任务接取！");
             globalThis.npcActivePanels[npcId]?.refreshBoard?.();
         }
@@ -285,10 +280,10 @@ export async function openDMPanel(npcId, options = {}) {
         render:  (html) => _bindDMPanelEvents(html, {
             npcId, targetNPC, targetFactionId, targetFactionName,
             factionMembers, allNpcsRaw, repData, questsData,
-            goldScaling, systemPresets, questJournal, app
+            goldScaling, systemPresets, app
         })
     }, { width: 550, height: "auto", resizable: true,
-         left: window.innerWidth - 570, top: 20 });
+         left: window.innerWidth - 570, top: 20, zIndex: 10001 });
 
     app.render(true);
 }
@@ -299,7 +294,7 @@ function _bindDMPanelEvents(html, ctx) {
     const {
         npcId, targetNPC, targetFactionId, targetFactionName,
         factionMembers, allNpcsRaw, repData, questsData,
-        goldScaling, systemPresets, questJournal, app
+        goldScaling, systemPresets, app
     } = ctx;
 
     let currentAffTarget = "global";
@@ -553,10 +548,7 @@ function _bindDMPanelEvents(html, ctx) {
         repData, goldScaling,
         getCurrentAff,
         refreshBoard: () => updateAffectionUI(getCurrentAff()),
-        syncJournalForNPC: (id) => {
-            const npc = allNpcsRaw.find(n => n.id === id);
-            if (npc) _syncJournalForNPC(id, npc, repData, questsData, allNpcsRaw, "");
-        }
+        syncJournalForNPC: () => {}
     });
 
     // ── 保存任务 ──────────────────────────────────────────────
@@ -816,7 +808,7 @@ function _generateQuestBoardHtml(currentAff, npcId, allNpcsRaw, questsData, gold
 
 function _bindBoardEvents(html, ctx, updateAffectionUI) {
     const { npcId, targetNPC, targetFactionId, allNpcsRaw,
-            repData, questsData, goldScaling, factionMembers } = ctx;
+            repData, questsData, goldScaling, factionMembers, systemPresets } = ctx;
 
     const getCurrentAff = () => {
         const sel = html.find("#aff-target-select").val() || "global";
@@ -869,7 +861,6 @@ function _bindBoardEvents(html, ctx, updateAffectionUI) {
         const idx = questsData.findIndex(x => x.id === qid);
         if (idx > -1) questsData.splice(idx, 1);
         await saveQuests(questsData);
-        await _syncJournalForNPC(npcId, targetNPC, repData, questsData, allNpcsRaw, "");
         updateAffectionUI(getCurrentAff());
     });
 
@@ -880,10 +871,6 @@ function _bindBoardEvents(html, ctx, updateAffectionUI) {
         q.status     = "active";
         q.timeAccept = getWorldTimeString();
         await saveQuests(questsData);
-        await _syncJournalForNPC(npcId, targetNPC, repData, questsData, allNpcsRaw, "");
-        if (q.npcId !== npcId)
-            await _syncJournalForNPC(q.npcId, allNpcsRaw.find(n => n.id === q.npcId),
-                repData, questsData, allNpcsRaw, "");
         updateAffectionUI(getCurrentAff());
     });
 
@@ -955,10 +942,6 @@ function _bindBoardEvents(html, ctx, updateAffectionUI) {
         q.timeFail = null; q.settlerName = null;
         q.lastPayTime = null; q.payHistory = []; q.currentPhase = 0;
         await saveQuests(questsData);
-        await _syncJournalForNPC(npcId, targetNPC, repData, questsData, allNpcsRaw, "");
-        if (q.npcId !== npcId)
-            await _syncJournalForNPC(q.npcId, allNpcsRaw.find(n => n.id === q.npcId),
-                repData, questsData, allNpcsRaw, "");
         updateAffectionUI(getCurrentAff());
     });
 
@@ -1016,7 +999,6 @@ function _bindBoardEvents(html, ctx, updateAffectionUI) {
         q.payHistory   ??= [];
         q.payHistory.push(nowTime);
         await saveQuests(questsData);
-        await _syncJournalForNPC(npcId, targetNPC, repData, questsData, allNpcsRaw, "");
         ui.notifications.success("发薪完毕！");
         updateAffectionUI(getCurrentAff());
     });
@@ -1212,25 +1194,49 @@ function _promptAndSettle(q, isComplete, isFinishPeriodic, ctx, html, updateAffe
 }
 
 // ─── 辅助函数 ─────────────────────────────────────────────────
-
 async function _finalize(q, repData, questsData, npcId, targetNPC, allNpcsRaw) {
     await saveRepData(repData);
     await saveQuests(questsData);
-    await _syncJournalForNPC(npcId, targetNPC, repData, questsData, allNpcsRaw, "");
-    if (q.npcId !== npcId) {
-        const ownerNpc = allNpcsRaw.find(n => n.id === q.npcId);
-        if (ownerNpc)
-            await _syncJournalForNPC(q.npcId, ownerNpc, repData, questsData, allNpcsRaw, "");
-    }
 }
 
 function _resolveTargetActors(q) {
     const targetIdStr = q.targetId || "ALL";
     if (targetIdStr === "ALL")
         return game.actors.filter(a => a.type === "character");
-    return targetIdStr.split(",")
-        .map(id => game.actors.get(id))
-        .filter(Boolean);
+
+    const ids    = targetIdStr.split(",").map(s => s.trim()).filter(Boolean);
+    const result = [];
+
+    for (const id of ids) {
+        const actor = game.actors.get(id);
+        if (!actor) continue;
+
+        if (actor.type.match(/party|group/i)) {
+            const memberIds = actor.system?.members ?? [];
+            if (memberIds.length > 0) {
+                for (const m of memberIds) {
+                    const a = game.actors.get(m.id ?? m);
+                    if (a && a.type === "character" &&
+                        !result.find(x => x.id === a.id))
+                        result.push(a);
+                }
+            } else {
+                game.actors
+                    .filter(a => a.type === "character")
+                    .forEach(a => {
+                        if (!result.find(x => x.id === a.id))
+                            result.push(a);
+                    });
+            }
+        } else if (actor.type === "character") {
+            if (!result.find(x => x.id === actor.id))
+                result.push(actor);
+        }
+    }
+
+    return result.length > 0
+        ? result
+        : game.actors.filter(a => a.type === "character");
 }
 
 async function _distributeRewards(q, phase, targetActors, isMultiPrivate, currentAff, goldScaling) {
@@ -1563,10 +1569,6 @@ function _openNpcBackupPanel(targetNPC, repData, questsData, npcId, app, allNpcs
                                     filtered.push(...restored);
                                     await saveQuests(filtered);
 
-                                    await _syncJournalForNPC(
-                                        npcId, targetNPC, repData, filtered, allNpcsRaw, ""
-                                    );
-
                                     ui.notifications.success(
                                         "该NPC的数据已还原完成！面板即将刷新。"
                                     );
@@ -1677,188 +1679,4 @@ function _openQuestEditorWindow(q, ctx) {
     }
 
     new QuestEditorApp().render(true);
-}
-
-// ─── 同步世界日志 ─────────────────────────────────────────────
-
-async function _syncJournalForNPC(npcId, npcObj, repData, questsData, allNpcsRaw, factionName) {
-    if (!npcObj) return;
-
-    let fName = factionName;
-    if (!fName) {
-        for (const [fid, fData] of Object.entries(repData.factions)) {
-            if (fid.startsWith("-=")) continue;
-            if (fData?.members.find(n => n.id === npcId)) {
-                fName = fData.name;
-                break;
-            }
-        }
-        fName = fName || "独立 NPC";
-    }
-
-    const questsFolder = game.folders.find(
-        f => f.type === "JournalEntry" &&
-             f.name.trim().toLowerCase() === "quests"
-    ) ?? await Folder.create({ name: "Quests", type: "JournalEntry" });
-
-    const npcQs = questsData.filter(
-        q => q.npcId === npcId && q.status !== "avail"
-    );
-
-    const journalGroups  = {};
-    const updatedJournalIds = new Set();
-
-    for (const q of npcQs) {
-        const targetIdStr = q.targetId || "ALL";
-        const isPrivate   = targetIdStr !== "ALL" &&
-            !game.actors.get(targetIdStr.split(",")[0])?.type.match(/party|group/i);
-        const jName = isPrivate
-            ? `私密任务 - ${q.targetName || "玩家"}`
-            : (fName === "独立 NPC" ? "独立 NPC" : fName);
-
-        journalGroups[jName] ??= { isPrivate, targetId: targetIdStr, qs: [] };
-        journalGroups[jName].qs.push(q);
-    }
-
-    for (const [jName, group] of Object.entries(journalGroups)) {
-        let journal = game.journal.find(
-            j => j.name === jName && j.folder?.id === questsFolder.id
-        );
-
-        const ownership = { default: 0 };
-        if (group.isPrivate) {
-            const tIds = group.targetId.split(",");
-            for (const tid of tIds) {
-                const tActor = game.actors.get(tid);
-                if (tActor) {
-                    for (const [uid, lvl] of Object.entries(tActor.ownership)) {
-                        if (lvl >= 3 && uid !== "default") ownership[uid] = 3;
-                    }
-                }
-                const fallback = game.users.find(u => u.character?.id === tid);
-                if (fallback) ownership[fallback.id] = 3;
-            }
-        } else {
-            ownership.default = 3;
-        }
-
-        if (!journal) {
-            journal = await JournalEntry.create({
-                name:      jName,
-                folder:    questsFolder.id,
-                ownership: ownership
-            });
-        } else {
-            const newOwn = foundry.utils.duplicate(journal.ownership);
-            Object.assign(newOwn, ownership);
-            await journal.update({ ownership: newOwn });
-        }
-        updatedJournalIds.add(journal.id);
-
-        const newContent = group.qs.map(q => {
-            const cp    = q.currentPhase || 0;
-            const phase = (q.phases?.length > cp) ? q.phases[cp] : q;
-
-            const displayItems = parseItemsWithQuantity(phase.items).map(i =>
-                i.qty > 1
-                    ? `${i.name} <b style="color:#2ecc71">x${i.qty}</b>`
-                    : i.name
-            ).join(", ") || "无";
-
-            const goldStr   = phase.goldNum ? `${phase.goldNum}${q.goldType || "gp"}` : "";
-            const rewardStr = [goldStr, displayItems].filter(Boolean).join(" | ");
-
-            const titlePrefix  = q.status === "done"
-                ? "(已完成) "
-                : q.status === "failed" ? "(已失败) " : "";
-            const strikeStyle  = (q.status === "done" || q.status === "failed")
-                ? "text-decoration:line-through; opacity:0.7;"
-                : "";
-
-            const periodicInfo = q.isPeriodic
-                ? `<p style="color:#e67e22; font-weight:bold; margin-top:5px;">
-                       <i class="fas fa-sync"></i> 发薪周期：每 ${q.periodDays} 天
-                   </p>`
-                : "";
-
-            const phaseInfo = (q.phases?.length > 1)
-                ? `<p style="color:#3498db; font-weight:bold; margin-top:2px;">
-                       [当前进度: 第 ${cp + 1} 阶段 / 共 ${q.phases.length} 阶段]
-                   </p>`
-                : "";
-
-            const settlerInfo = q.settlerName
-                ? `<p style="color:#9b59b6; font-size:0.85em; margin-top:4px; font-weight:bold;">
-                       <i class="fas fa-handshake"></i> 代为结算: ${q.settlerName}
-                   </p>`
-                : "";
-
-            const ownerNpc  = allNpcsRaw.find(n => n.id === q.npcId);
-            const ownerInfo = (q.npcId !== npcId)
-                ? `<p style="color:#3498db; font-size:0.85em; margin-top:4px; font-weight:bold;">
-                       <i class="fas fa-user-tag"></i> 发布人: ${ownerNpc?.name || "未知"}
-                   </p>`
-                : "";
-
-            const timeInfoArr = [];
-            if (q.timeAccept)
-                timeInfoArr.push(
-                    `<span style="color:#7f8c8d; font-style:italic;">▶ 接取: ${q.timeAccept}</span>`
-                );
-            (q.payHistory || []).forEach((time, index) => {
-                const label = index === 0 ? "💰 首次发薪" : `💰 续发(${index + 1})`;
-                timeInfoArr.push(
-                    `<span style="color:#f39c12; font-style:italic;">${label}: ${time}</span>`
-                );
-            });
-            if (q.status === "done" && q.timeComplete)
-                timeInfoArr.push(
-                    `<span style="color:#2ecc71; font-style:italic;">✔️ 完成: ${q.timeComplete}</span>`
-                );
-            if (q.status === "failed" && q.timeFail)
-                timeInfoArr.push(
-                    `<span style="color:#e74c3c; font-style:italic;">❌ 失败: ${q.timeFail}</span>`
-                );
-            if (q.timeLimit)
-                timeInfoArr.push(
-                    `<span style="color:#e67e22; font-style:italic;">⌛ 时限: ${q.timeLimit}</span>`
-                );
-            const timeHtml = timeInfoArr.length > 0
-                ? `<p style="margin-top:8px; font-size:0.9em; margin-bottom:5px;">
-                       ${timeInfoArr.join(" &nbsp;&nbsp; ")}
-                   </p>`
-                : "";
-
-            return `
-            <h3>${titlePrefix}${q.name}</h3>
-            <div style="${strikeStyle}">
-                ${phaseInfo}
-                <ul><li>${(phase.desc || "").replace(/\n/g, "</li><li>")}</li></ul>
-                <p>预期报酬: ${rewardStr || "无"}</p>
-                ${ownerInfo}${settlerInfo}
-            </div>
-            ${timeHtml}${periodicInfo}
-            <hr>`;
-        }).join("");
-
-        const page = journal.pages.find(p => p.name === npcObj.name);
-        if (!page) {
-            await JournalEntryPage.create(
-                { name: npcObj.name, text: { content: newContent, format: 1 } },
-                { parent: journal }
-            );
-        } else {
-            await page.update({ "text.content": newContent });
-        }
-    }
-
-    // 清理已无任务的旧页面
-    const journalsInFolder = game.journal.filter(
-        j => j.folder?.id === questsFolder.id
-    );
-    for (const j of journalsInFolder) {
-        if (updatedJournalIds.has(j.id)) continue;
-        const oldPage = j.pages.find(p => p.name === npcObj.name);
-        if (oldPage) await oldPage.delete();
-    }
 }
