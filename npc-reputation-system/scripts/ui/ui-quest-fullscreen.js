@@ -241,7 +241,8 @@ class QuestFullscreen {
                     ${this._isGM ? `<i class="fas fa-grip-vertical" style="color:#444;font-size:0.75em;margin-right:4px;cursor:grab;"></i>` : ""}
                     <i class="fas fa-chevron-${expanded ? "down" : "right"} qfs-fchev"></i>
                     <img src="${f.img || "icons/svg/item-bag.svg"}" class="qfs-faction-icon">
-                    <span class="qfs-faction-name">${f.name}</span>
+                    <span class="qfs-faction-name qfs-faction-name-editable"
+                        data-fid="${fid}" ${this._isGM ? 'title="双击重命名"' : ""}>${f.name}</span>
                     <span class="qfs-faction-count">${f.members.length}</span>
                 </div>
                 <div class="qfs-faction-members" data-fid="${fid}" ${expanded ? "" : "style=\"display:none\""}>
@@ -310,6 +311,38 @@ class QuestFullscreen {
             this._renderToolbar();
             this._renderContent();
         });
+
+                if (this._isGM) {
+            sb.find(".qfs-faction-name-editable").on("dblclick", (e) => {
+                e.stopPropagation();
+                const span = $(e.currentTarget);
+                const fid  = span.data("fid");
+                const old  = span.text().trim();
+                const input = $(`<input type="text" value="${old}"
+                    style="background:#111;color:#fff;border:1px solid #3498db;
+                           padding:2px 6px;border-radius:3px;font-size:0.76em;
+                           width:100px;height:20px;font-weight:bold;">`);
+                span.replaceWith(input);
+                input.focus().select();
+
+                const commit = async () => {
+                    const val     = input.val().trim();
+                    const newName = val || old;
+                    this._repData = getRepData();
+                    if (this._repData.factions[fid]) {
+                        this._repData.factions[fid].name = newName;
+                        await saveRepData(this._repData);
+                    }
+                    await this._reload();
+                };
+
+                input.on("keydown", async (ev) => {
+                    if (ev.key === "Enter")  { ev.preventDefault(); await commit(); }
+                    if (ev.key === "Escape") { await this._reload(); }
+                });
+                input.on("blur", commit);
+            });
+        }
     }
 
     _buildNpcRow(npc, showHandle = false) {

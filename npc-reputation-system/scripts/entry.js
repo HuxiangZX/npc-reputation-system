@@ -5,7 +5,6 @@
 const MODULE_ID = "npc-reputation-system";
 
 const _openWindows = {
-    playerPresets:   null,
     questFullscreen: null
 };
 
@@ -26,15 +25,6 @@ Hooks.once("init", () => {
         hint:       "选中NPC Token后使用快捷键可直接进入；此处点击则弹出选择列表。",
         icon:       "fas fa-user-cog",
         type:       NpcDetailLauncher,
-        restricted: true
-    });
-
-    game.settings.registerMenu(MODULE_ID, "menuPlayerPresets", {
-        name:       "玩家互动预设分组",
-        label:      "👥 管理玩家预设",
-        hint:       "配置 DM 拦截面板中的玩家快速选择预设分组。",
-        icon:       "fas fa-users",
-        type:       PlayerPresetsForm,
         restricted: true
     });
 
@@ -60,14 +50,6 @@ Hooks.once("init", () => {
         editable:   [],
         restricted: true,
         onDown:     () => _toggleDMPanel()
-    });
-
-    game.keybindings.register(MODULE_ID, "openPlayerPresets", {
-        name:       "[GM] 打开玩家互动预设分组",
-        hint:       "打开玩家预设分组管理面板；已打开则关闭。",
-        editable:   [],
-        restricted: true,
-        onDown:     () => _toggleWindow("playerPresets", () => new PlayerPresetsForm())
     });
 
     game.keybindings.register(MODULE_ID, "openPlayerPanel", {
@@ -306,164 +288,6 @@ async function _openNpcPickDialog(repData, allNpcs) {
     }, { width: 360 }).render(true);
 }
 
-// ══════════════════════════════════════════════════════════════
-// 玩家互动预设分组弹窗
-// ══════════════════════════════════════════════════════════════
-
-class PlayerPresetsForm extends FormApplication {
-
-    static get defaultOptions() {
-        return foundry.utils.mergeObject(super.defaultOptions, {
-            id:             "npc-player-presets",
-            title:          "玩家互动预设分组 - NPC声望系统",
-            width:          420,
-            height:         "auto",
-            resizable:      true,
-            closeOnSubmit:  false,
-            submitOnChange: false,
-            submitOnClose:  false
-        });
-    }
-
-    async _renderInner(_data) {
-        const { getRepData } = await import("./data-manager.js");
-        this._repData = getRepData();
-        this._presets = this._repData?.settings?.presets ?? [];
-        return $(this._buildHTML());
-    }
-
-    _buildHTML() {
-        const users = game.users.filter(u => !u.isGM && u.character);
-
-        const listHtml = this._presets.length === 0
-            ? `<div style="text-align:center;color:#777;padding:20px;">
-                   暂无预设分组</div>`
-            : this._presets.map((p, idx) => `
-                <div class="pp-row" data-idx="${idx}"
-                    style="background:#1a252f;padding:10px;
-                           margin-bottom:8px;border-radius:4px;
-                           border:1px solid #2c3e50;">
-                    <div style="display:flex;justify-content:space-between;
-                        align-items:center;margin-bottom:8px;">
-                        <input type="text" class="pp-name"
-                            data-idx="${idx}" value="${p.name}"
-                            style="flex:1;background:#111;color:#fff;
-                                   border:1px solid #555;padding:4px 8px;
-                                   border-radius:3px;font-weight:bold;
-                                   margin-right:8px;height:30px;">
-                        <button type="button" class="pp-del"
-                            data-idx="${idx}"
-                            style="background:#c0392b;border:none;
-                                   color:#fff;width:30px;height:30px;
-                                   border-radius:3px;cursor:pointer;
-                                   flex:none;">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                    <div style="display:flex;flex-wrap:wrap;gap:6px;">
-                        ${users.map(u => `
-                            <label style="display:flex;align-items:center;
-                                gap:5px;background:#2c3e50;padding:4px 8px;
-                                border-radius:3px;cursor:pointer;
-                                color:#ecf0f1;font-size:0.9em;">
-                                <input type="checkbox" class="pp-user-cb"
-                                    data-idx="${idx}" value="${u.id}"
-                                    style="cursor:pointer;"
-                                    ${p.users.includes(u.id)
-                                        ? "checked" : ""}>
-                                ${u.name}
-                                <span style="color:#7f8c8d;font-size:0.85em;">
-                                    (${u.character.name})
-                                </span>
-                            </label>`
-                        ).join("")}
-                    </div>
-                </div>`
-            ).join("");
-
-        return `
-        <form onsubmit="return false;"
-            style="padding:15px;background:#1a1a1a;
-                   color:#eee;font-family:'Signika',sans-serif;">
-            <p style="color:#aaa;font-size:0.9em;margin-top:0;
-                margin-bottom:12px;background:#252525;padding:8px;
-                border-radius:4px;border:1px solid #333;">
-                <i class="fas fa-info-circle" style="color:#3498db;"></i>
-                这些预设用于 DM 拦截审批面板中，快速勾选特定玩家组合。
-            </p>
-            <div id="pp-list"
-                style="max-height:400px;overflow-y:auto;padding-right:4px;">
-                ${listHtml}
-            </div>
-            <button type="button" id="pp-add"
-                style="width:100%;margin-top:12px;padding:8px;
-                       background:#2980b9;border:1px solid #3498db;
-                       color:#fff;border-radius:4px;cursor:pointer;
-                       font-weight:bold;font-size:1em;">
-                <i class="fas fa-plus"></i> 新建预设分组
-            </button>
-            <button type="button" id="pp-save"
-                style="width:100%;margin-top:8px;padding:10px;
-                       background:#27ae60;border:1px solid #2ecc71;
-                       color:#fff;border-radius:4px;cursor:pointer;
-                       font-weight:bold;font-size:1em;">
-                <i class="fas fa-save"></i> 保存预设
-            </button>
-        </form>`;
-    }
-
-    activateListeners(html) {
-        super.activateListeners(html);
-        html.find("form").on("submit", e => e.preventDefault());
-
-        html.find(".pp-name").on("change", (e) => {
-            const idx = Number($(e.currentTarget).data("idx"));
-            this._presets[idx].name = $(e.currentTarget).val();
-        });
-
-        html.find(".pp-user-cb").on("change", (e) => {
-            const idx = Number($(e.currentTarget).data("idx"));
-            const uid = $(e.currentTarget).val();
-            if ($(e.currentTarget).is(":checked")) {
-                if (!this._presets[idx].users.includes(uid))
-                    this._presets[idx].users.push(uid);
-            } else {
-                this._presets[idx].users =
-                    this._presets[idx].users.filter(x => x !== uid);
-            }
-        });
-
-        html.find(".pp-del").on("click", async (e) => {
-            const idx = Number($(e.currentTarget).data("idx"));
-            this._presets.splice(idx, 1);
-            await this._savePresets();
-            this.render(true);
-        });
-
-        html.find("#pp-add").on("click", async () => {
-            this._presets.push({
-                id: foundry.utils.randomID(), name: "新预设", users: []
-            });
-            await this._savePresets();
-            this.render(true);
-        });
-
-        html.find("#pp-save").on("click", async () => {
-            await this._savePresets();
-            ui.notifications.success("[NPC声望系统] 玩家预设分组已保存。");
-            this.close();
-        });
-    }
-
-    async _updateObject() {}
-
-    async _savePresets() {
-        const { saveRepData } = await import("./data-manager.js");
-        this._repData.settings        ??= {};
-        this._repData.settings.presets  = this._presets;
-        await saveRepData(this._repData);
-    }
-}
 
 // ══════════════════════════════════════════════════════════════
 // 启动器类

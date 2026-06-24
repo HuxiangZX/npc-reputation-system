@@ -240,7 +240,7 @@ function _bindAdminEvents(html, data, journal, refresh, renderNpc, expandedFacti
 
     // ── 修改NPC归属 ───────────────────────────────────────────
     html.find(".edit-npc-f").click(e => {
-        const nid    = $(e.currentTarget).data("nid");
+       const nid    = $(e.currentTarget).data("nid");
         const oldFid = $(e.currentTarget).data("fid");
         let npc      = oldFid === "ind"
             ? data.independent.find(n => n.id === nid)
@@ -276,27 +276,28 @@ function _bindAdminEvents(html, data, journal, refresh, renderNpc, expandedFacti
                     label: "保存转移", icon: '<i class="fas fa-save"></i>',
                     callback: async (h) => {
                         const newFid = h.find("#edit-n-f").val();
-                        // 从旧位置移除
-                        if (oldFid === "ind")
+                        const newJob = h.find("#edit-n-j").val();
+
+                        if (oldFid === "ind") {
                             data.independent = data.independent.filter(n => n.id !== nid);
-                        else
-                            data.factions[oldFid].members =
-                                data.factions[oldFid].members.filter(n => n.id !== nid);
-                        // 放到新位置
+                        } else {
+                            data.factions[oldFid].members = data.factions[oldFid].members.filter(n => n.id !== nid);
+                        }
+
                         if (newFid === "ind") {
-                            npc.title = ""; npc.weight = 0;
+                            npc.title  = "";
+                            npc.weight = 0;
                             data.independent.push(npc);
                         } else {
-                            const jn  = h.find("#edit-n-j").val();
-                            const job = (data.factions[newFid]?.jobs || [])
-                                            .find(j => j.name === jn)
+                            const job = (data.factions[newFid]?.jobs || []).find(j => j.name === newJob)
                                         ?? { name: "平民", weight: 2 };
                             npc.title  = job.name;
                             npc.weight = job.weight;
                             data.factions[newFid].members.push(npc);
                         }
+    
                         await saveRepData(data);
-                        refresh();
+                    refresh();
                     }
                 }
             },
@@ -322,7 +323,6 @@ function _bindAdminEvents(html, data, journal, refresh, renderNpc, expandedFacti
             }
         }, { resizable: true }).render(true);
     });
-
     // ── 修改派系图标 ──────────────────────────────────────────
     html.find(".edit-f-img").click(e => {
         const fid = $(e.currentTarget).data("fid");
@@ -504,13 +504,16 @@ function _openFactionManager(data, journal, refresh) {
                     style="display:flex; justify-content:space-between; align-items:center;
                            border-bottom:1px solid #444; padding-bottom:5px;
                            margin-bottom:8px; cursor:pointer;">
-                    <b style="font-size:1.1em; color:#3498db; display:flex; align-items:center;">
+                    <b style="font-size:1.1em; color:#3498db; display:flex; align-items:center; flex:1;">
                         <div class="drag-handle" title="按住拖拽派系排序">
                             <i class="fas fa-grip-lines"></i>
                         </div>
                         <i class="fas ${isExpanded ? "fa-chevron-down" : "fa-chevron-right"} t-icon"
                            style="margin-right:5px; width:15px;"></i>
-                        ${f.name}
+                        <span class="f-name-display" data-fid="${id}" style="cursor:default;">${f.name}</span>
+                        <i class="fas fa-pen f-rename-btn" data-fid="${id}"
+                           style="margin-left:6px; font-size:0.75em; color:#888; cursor:pointer;"
+                           title="重命名派系"></i>
                     </b>
                     <a class="f-del-btn" data-fid="${id}"
                        style="color:#e74c3c; cursor:pointer;" title="彻底删除此派系">
@@ -559,6 +562,43 @@ function _openFactionManager(data, journal, refresh) {
     const bindEvents = (h) => {
         bindDragAndDrop(h.find("#settings-f-container")[0], ".job-list-edit", ".drag-handle", () => {});
 
+        h.find(".f-rename-btn").off("click").on("click", function (e) {
+            e.stopPropagation();
+            const fid  = $(this).data("fid");
+            const span = h.find(`.f-name-display[data-fid="${fid}"]`);
+            const old  = span.text().trim();
+            const input = $(`<input type="text" value="${old}"
+                style="background:#111;color:#fff;border:1px solid #3498db;
+                       padding:2px 6px;border-radius:3px;font-size:1em;
+                       width:120px;height:24px;">`);
+            span.replaceWith(input);
+            input.focus().select();
+
+            const commit = async () => {
+                const val = input.val().trim();
+                const newName = val || old;
+                if (data.factions[fid]) data.factions[fid].name = newName;
+                await saveRepData(data);
+                const newSpan = $(`<span class="f-name-display" data-fid="${fid}"
+                    style="cursor:default;">${newName}</span>`);
+                input.replaceWith(newSpan);
+                h.find(`.f-rename-btn[data-fid="${fid}"]`).off("click").on("click", function (e2) {
+                    e2.stopPropagation();
+                    newSpan.trigger("dblclick");
+                });
+            };
+
+            input.on("keydown", async (ev) => {
+                if (ev.key === "Enter") { ev.preventDefault(); await commit(); }
+                if (ev.key === "Escape") {
+                    const revert = $(`<span class="f-name-display" data-fid="${fid}"
+                        style="cursor:default;">${old}</span>`);
+                    input.replaceWith(revert);
+                }
+            });
+            input.on("blur", commit);
+        });
+        
         h.find(".f-toggle").off("click").click(function (e) {
             if ($(e.target).closest(".f-del-btn, .drag-handle").length) return;
             const fid        = $(this).closest(".job-list-edit").data("fid");

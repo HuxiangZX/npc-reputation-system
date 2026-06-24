@@ -1,20 +1,8 @@
-/**
- * ui-intercept-panel.js
- * DM 拦截审批面板（从宏3中拆分）
- */
-
 import { NpcRepApi }      from "../api.js";
 import { activeDialogLock } from "../radar-engine.js";
 
 const MODULE_ID = "npc-reputation-system";
 
-/**
- * 显示 DM 拦截审批面板
- * @param {Array}  targetNPCs   - 触发的NPC对象数组
- * @param {object} triggerToken - 触发的玩家Token文档
- * @param {object} sys          - 当前引擎设置
- * @param {string} rawFid       - 派系ID或 "ind_xxx"
- */
 export function showInterceptPanel(targetNPCs, triggerToken, sys, rawFid = "未知") {
     const lockKey = targetNPCs.map(n => n.id).sort().join("_");
     if (activeDialogLock.has(lockKey)) return;
@@ -26,7 +14,6 @@ export function showInterceptPanel(targetNPCs, triggerToken, sys, rawFid = "未�
         return ui.notifications.info("当前没有玩家在线。");
     }
 
-    // ── 构建玩家Checkbox列表 ────────────────────────────────
     const userCheckboxes = onlineUsers.map(u => `
         <label style="display:flex; align-items:center; padding:8px 10px;
             background:#2c3e50; color:#ecf0f1; margin-bottom:6px;
@@ -40,17 +27,6 @@ export function showInterceptPanel(targetNPCs, triggerToken, sys, rawFid = "未�
         </label>`
     ).join("");
 
-    // ── 预设按钮 ────────────────────────────────────────────
-    const presetButtons = (sys.presets || []).map(p => `
-        <button class="p-btn" data-users='${JSON.stringify(p.users)}'
-            style="flex:1; padding:8px; font-size:0.95em; background:#2980b9;
-                   color:#fff; border:1px solid #1f618d; border-radius:4px;
-                   font-weight:bold; cursor:pointer;">
-            ${p.name}
-        </button>`
-    ).join("");
-
-    // ── NPC互动语录预处理 ────────────────────────────────────
     const npcDataMap = {};
     targetNPCs.forEach(n => {
         const effAff = n.affection || 0;
@@ -68,7 +44,6 @@ export function showInterceptPanel(targetNPCs, triggerToken, sys, rawFid = "未�
         ? "❌ 独立NPC"
         : (sys.fullData?.factions?.[rawFid]?.name || "未知派系");
 
-    // ── 多NPC选择器（仅扎堆时显示） ─────────────────────────
     const npcSelectHtml = targetNPCs.length > 1 ? `
         <div style="margin-bottom:12px; background:rgba(52,152,219,0.1);
             padding:10px; border-radius:6px; border:1px solid #2c3e50;
@@ -116,9 +91,6 @@ export function showInterceptPanel(targetNPCs, triggerToken, sys, rawFid = "未�
 
             <p style="color:#ccc; margin-bottom:10px; font-size:0.95em;">
                 请选择向哪些玩家推送此任务板请求：</p>
-            <div style="margin-bottom:10px; display:flex; gap:6px; flex-wrap:wrap;">
-                ${presetButtons}
-            </div>
             <div style="margin-bottom:12px; display:flex; gap:6px;">
                 <button class="sel-all-btn"
                     style="flex:1; padding:6px; background:#444; color:#fff;
@@ -157,7 +129,6 @@ export function showInterceptPanel(targetNPCs, triggerToken, sys, rawFid = "未�
                     const finalNPC  = targetNPCs.find(n => n.id === selectedNpcId);
                     const finalData = npcDataMap[selectedNpcId];
 
-                    // 向玩家发送互动卡片
                     const chatContent = `
                     <div style="background:#111; border:1px solid #444; padding:10px;
                          border-radius:5px; text-align:center;">
@@ -181,7 +152,6 @@ export function showInterceptPanel(targetNPCs, triggerToken, sys, rawFid = "未�
                         whisper: selectedUserIds
                     });
 
-                    // 同时给DM打开管理面板
                     NpcRepApi.openDMPanel(finalNPC.id);
                 }
             },
@@ -189,7 +159,6 @@ export function showInterceptPanel(targetNPCs, triggerToken, sys, rawFid = "未�
         },
         close: () => activeDialogLock.delete(lockKey),
         render: (html) => {
-            // 多NPC切换时更新预览
             if (targetNPCs.length > 1) {
                 html.find("#intercept-npc-select").change(function () {
                     const d = npcDataMap[$(this).val()];
@@ -204,13 +173,6 @@ export function showInterceptPanel(targetNPCs, triggerToken, sys, rawFid = "未�
             html.find(".sel-none-btn").click(
                 () => html.find(".target-user-cb").prop("checked", false)
             );
-            html.find(".p-btn").click(function () {
-                const uArr = JSON.parse($(this).attr("data-users"));
-                html.find(".target-user-cb").prop("checked", false);
-                html.find(".target-user-cb").each(function () {
-                    if (uArr.includes($(this).val())) $(this).prop("checked", true);
-                });
-            });
         }
     }, { width: 440, resizable: true }).render(true);
 }

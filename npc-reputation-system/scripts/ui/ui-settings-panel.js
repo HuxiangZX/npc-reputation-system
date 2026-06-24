@@ -72,18 +72,6 @@ export function openSettingsPanel(data, journal, refresh) {
                     style="width:60px; text-align:center; background:#111;
                            color:#fff; border:1px solid #555;">
             </div>
-
-            <h3 style="border-bottom:1px solid #444; padding-bottom:5px;
-                margin-top:15px; color:#e67e22;">
-                玩家互动预设分组
-            </h3>
-            <div id="preset-container"
-                style="max-height:220px; overflow-y:auto; border:1px solid #333;
-                       padding:5px; margin-bottom:10px; background:#111;"></div>
-            <button id="add-preset-btn" class="n-btn"
-                style="width:100%; background:#2980b9;">
-                <i class="fas fa-plus"></i> 新建预设分组
-            </button>
         </div>`,
         buttons: {
             save: {
@@ -98,87 +86,6 @@ export function openSettingsPanel(data, journal, refresh) {
                     ui.notifications.success("系统设置已保存！");
                 }
             }
-        },
-        render: (h) => {
-            const renderPresets = () => {
-                const pList = s.presets.length === 0
-                    ? '<p style="text-align:center; color:#777;">暂无预设</p>'
-                    : s.presets.map((p, idx) => `
-                        <div class="preset-row">
-                            <input type="text" class="p-name" data-idx="${idx}" value="${p.name}"
-                                style="background:#000; color:#fff; border:1px solid #555;
-                                       padding:4px; width:130px; font-weight:bold;">
-                            <span style="font-size:0.85em; color:#bdc3c7;">
-                                包含 ${p.users.length} 人
-                            </span>
-                            <div>
-                                <button class="n-btn p-edit" data-idx="${idx}"
-                                    style="padding:4px 8px; background:#f39c12; border:none; color:#fff;">
-                                    <i class="fas fa-users"></i>
-                                </button>
-                                <button class="n-btn p-del" data-idx="${idx}"
-                                    style="padding:4px 8px; background:#c0392b; border:none; color:#fff;">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </div>`
-                    ).join("");
-
-                h.find("#preset-container").html(pList);
-
-                h.find(".p-name").on("change", function () {
-                    s.presets[$(this).data("idx")].name = $(this).val();
-                });
-
-                h.find(".p-del").click(function () {
-                    s.presets.splice($(this).data("idx"), 1);
-                    renderPresets();
-                });
-
-                h.find(".p-edit").click(function () {
-                    const pIdx  = $(this).data("idx");
-                    const pData = s.presets[pIdx];
-                    const users = game.users.filter(u => !u.isGM && u.character);
-                    const cbHtml = users.map(u => `
-                        <label style="display:block; margin-bottom:6px; cursor:pointer;
-                            background:#2c3e50; padding:8px; border-radius:4px; color:#ecf0f1;">
-                            <input type="checkbox" class="u-cb" value="${u.id}"
-                                ${pData.users.includes(u.id) ? "checked" : ""}
-                                style="transform:scale(1.2); margin-right:8px;">
-                            ${u.name}
-                            <span style="color:#bdc3c7; font-size:0.85em;">
-                                (${u.character.name})
-                            </span>
-                        </label>`
-                    ).join("");
-
-                    new Dialog({
-                        title:   `编辑预设: ${pData.name}`,
-                        content: `<div style="padding:10px; background:#1a1a1a;">
-                            ${cbHtml}
-                        </div>`,
-                        buttons: {
-                            save: {
-                                label: "确认",
-                                callback: (sh) => {
-                                    const sel = [];
-                                    sh.find(".u-cb:checked").each(function () {
-                                        sel.push($(this).val());
-                                    });
-                                    s.presets[pIdx].users = sel;
-                                    renderPresets();
-                                }
-                            }
-                        }
-                    }, { resizable: true }).render(true);
-                });
-            };
-
-            renderPresets();
-            h.find("#add-preset-btn").click(() => {
-                s.presets.push({ id: foundry.utils.randomID(), name: "新预设", users: [] });
-                renderPresets();
-            });
         }
     }, { width: 400, resizable: true }).render(true);
 }
