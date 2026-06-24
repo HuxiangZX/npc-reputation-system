@@ -1241,9 +1241,6 @@ function _resolveTargetActors(q) {
 
 async function _distributeRewards(q, phase, targetActors, isMultiPrivate, currentAff, goldScaling) {
     const actualGold  = getFloatingGold(phase.goldNum, currentAff, goldScaling, q.useScale !== false);
-    const goldPerActor = (isMultiPrivate && targetActors.length > 0)
-        ? Math.floor(actualGold / targetActors.length)
-        : actualGold;
     const gType = q.goldType || "gp";
 
     const parsedItems = parseItemsWithQuantity(phase.items);
@@ -1267,6 +1264,30 @@ async function _distributeRewards(q, phase, targetActors, isMultiPrivate, curren
             }
         }
     }
+
+    const tid = q.targetId || "ALL";
+    if (tid !== "ALL") {
+        const ids = tid.split(",").map(s => s.trim()).filter(Boolean);
+        for (const id of ids) {
+            const actor = game.actors.get(id);
+            if (!actor) continue;
+            if (actor.type.match(/party|group/i)) {
+                if (actualGold > 0) {
+                    const curr = foundry.utils.duplicate(
+                        actor.system.currency || { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 });
+                    curr[gType] = (curr[gType] || 0) + actualGold;
+                    await actor.update({ "system.currency": curr });
+                }
+                if (itemsToCreate.length > 0)
+                    await Item.create(itemsToCreate, { parent: actor });
+                return;
+            }
+        }
+    }
+
+    const goldPerActor = (isMultiPrivate && targetActors.length > 0)
+        ? Math.floor(actualGold / targetActors.length)
+        : actualGold;
 
     for (const a of targetActors) {
         if (goldPerActor > 0) {

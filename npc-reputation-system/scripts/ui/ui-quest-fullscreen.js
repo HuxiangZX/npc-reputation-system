@@ -1612,8 +1612,27 @@ class QuestFullscreen {
                     itemsToCreate.push(itemData);
                 } else {
                     for (let i = 0; i < it.qty; i++)
-                        itemsToCreate.push(
-                            foundry.utils.duplicate(itemData));
+                        itemsToCreate.push(foundry.utils.duplicate(itemData));
+                }
+            }
+        }
+
+        const tid = q.targetId || "ALL";
+        if (tid !== "ALL") {
+            const ids = tid.split(",").map(s => s.trim()).filter(Boolean);
+            for (const id of ids) {
+                const actor = game.actors.get(id);
+                if (!actor) continue;
+                if (actor.type.match(/party|group/i)) {
+                    if (goldNum > 0) {
+                        const curr = foundry.utils.duplicate(
+                            actor.system.currency || { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 });
+                        curr[gType] = (curr[gType] || 0) + goldNum;
+                        await actor.update({ "system.currency": curr });
+                    }
+                    if (itemsToCreate.length > 0)
+                        await Item.create(itemsToCreate, { parent: actor });
+                    return;
                 }
             }
         }
@@ -1621,8 +1640,7 @@ class QuestFullscreen {
         for (const a of actors) {
             if (goldNum > 0) {
                 const curr = foundry.utils.duplicate(
-                    a.system.currency ||
-                    { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 });
+                    a.system.currency || { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 });
                 curr[gType] = (curr[gType] || 0) + goldNum;
                 await a.update({ "system.currency": curr });
             }
